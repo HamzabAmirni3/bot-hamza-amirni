@@ -691,21 +691,30 @@ ${settings.portfolio}
     });
 
     // Stability: Handle crashes gracefully and keep process alive
-    process.on('uncaughtException', (err) => {
-        console.error('Critical Uncaught Exception:', err);
-        // Don't exit immediately, try to keep going
-    });
+    // Moved outside to prevent memory leaks and MaxListenersExceededWarning
+    if (process.listeners('uncaughtException').length < 1) {
+        process.on('uncaughtException', (err) => {
+            if (err.message?.includes('Connection Closed')) return;
+            console.error('Critical Uncaught Exception:', err);
+        });
+    }
 
-    process.on('unhandledRejection', (reason, promise) => {
-        console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    });
+    if (process.listeners('unhandledRejection').length < 1) {
+        process.on('unhandledRejection', (reason, promise) => {
+            if (reason?.message?.includes('Connection Closed')) return;
+            console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+        });
+    }
+
     // Periodic check for schedulers/reminders
     setInterval(() => {
         try {
-            const { checkAndSendReminder } = require('./commands/autoreminder');
-            checkAndSendReminder(sock);
+            if (global.sock && global.sock.user) {
+                const { checkAndSendReminder } = require('./commands/autoreminder');
+                checkAndSendReminder(global.sock);
+            }
         } catch (e) { }
-    }, 30000);
+    }, 60000);
 }
 
 
