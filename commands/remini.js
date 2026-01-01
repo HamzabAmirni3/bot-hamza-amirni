@@ -1,23 +1,66 @@
+const axios = require('axios');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const settings = require('../settings');
 const { t } = require('../lib/language');
 
 async function reminiCommand(sock, chatId, msg, args, commands, userLang) {
     try {
-        const quoted = msg.quoted ? msg.quoted : msg;
-        const mime = (quoted.msg || quoted).mimetype || '';
+        let quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ? {
+            message: msg.message.extendedTextMessage.contextInfo.quotedMessage,
+            key: {
+                remoteJid: chatId,
+                id: msg.message.extendedTextMessage.contextInfo.stanzaId,
+                participant: msg.message.extendedTextMessage.contextInfo.participant
+            }
+        } : msg;
 
-        if (!/image/.test(mime)) {
+        const isImage = !!(quoted.message?.imageMessage || (quoted.message?.documentMessage && quoted.message.documentMessage.mimetype?.includes('image')));
+        const isViewOnce = !!(quoted.message?.viewOnceMessage?.message?.imageMessage || quoted.message?.viewOnceMessageV2?.message?.imageMessage);
+
+        if (!isImage && !isViewOnce) {
             return await sock.sendMessage(chatId, { text: t('ai_enhance.help', { prefix: settings.prefix }, userLang) }, { quoted: msg });
         }
 
+        // Send reaction and status
+        await sock.sendMessage(chatId, { react: { text: "🪄", key: msg.key } });
         await sock.sendMessage(chatId, { text: t('remini.wait', {}, userLang) }, { quoted: msg });
 
-        // Remini typically requires a paid API. For now, we inform the user via localized error.
-        await sock.sendMessage(chatId, { text: t('remini.error_no_api', {}, userLang) }, { quoted: msg });
+        // Download image
+        const buffer = await downloadMediaMessage(quoted, 'buffer', {}, {
+            logger: undefined,
+            reuploadRequest: sock.updateMediaMessage
+        });
+
+        if (!buffer) throw new Error("Failed to download image.");
+
+        // Upload to a temporary hosting (using Tioxy from uploader.js if available)
+        const { uploadImage } = require('../lib/uploader');
+        const imageUrl = await uploadImage(buffer);
+
+        if (!imageUrl) throw new Error("Failed to upload image for processing.");
+
+        // Call Vreden Remini API
+        const apiUrl = `https://api.vreden.my.id/api/remini?url=${encodeURIComponent(imageUrl)}`;
+        const response = await axios.get(apiUrl, { timeout: 60000 });
+
+        if (response.data && response.data.status && response.data.result) {
+            const resultUrl = response.data.result;
+
+            await sock.sendMessage(chatId, {
+                image: { url: resultUrl },
+                caption: `✨ *Successfully Enhanced!* ✅\n\n> ᴘᴏᴡᴇʀᴇᴅ ʙʏ ʜᴀᴍᴢᴀ ᴀᴍɪʀɴɪ`
+            }, { quoted: msg });
+
+            await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
+        } else {
+            throw new Error("API returned an invalid response.");
+        }
 
     } catch (error) {
-        console.error('Remini Error:', error);
-        await sock.sendMessage(chatId, { text: t('remini.error', {}, userLang) }, { quoted: msg });
+        console.error('Remini Error:', error.message);
+        const errMsg = userLang === 'ma' ? "❌ *ماعندي كي ندير ليها دبا، عاود جرب من بعد.*" : "❌ *Remini processing failed. Try again later.*";
+        await sock.sendMessage(chatId, { text: errMsg }, { quoted: msg });
+        await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
     }
 }
 
