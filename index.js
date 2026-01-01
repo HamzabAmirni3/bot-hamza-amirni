@@ -259,7 +259,10 @@ async function syncSession() {
     }
 }
 
+let isStarting = false;
 async function startBot() {
+    if (isStarting) return;
+    isStarting = true;
     await syncSession();
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
@@ -289,6 +292,11 @@ async function startBot() {
         markOnlineOnConnect: true,
         retryRequestDelayMs: 5000,
     });
+
+    // Clear existing global listeners if any
+    if (global.sock && global.sock.ev) {
+        try { global.sock.ev.removeAllListeners(); } catch (e) { }
+    }
 
 
 
@@ -343,6 +351,7 @@ async function startBot() {
         }
 
         if (connection === 'open') {
+            isStarting = false;
             console.log(chalk.green(`\n🌿Connected to => ${JSON.stringify(sock.user, null, 2)}\n`));
             console.log(chalk.bgGreen.black('\n                  [ حمزة اعمرني ]                  \n'));
             console.log(chalk.cyan('< ================================================== >\n'));
@@ -371,24 +380,9 @@ async function startBot() {
                         `• *Version:* ${settings.version || '2.0.0'}\n` +
                         `• *Mode:* ${settings.commandMode || 'Public'}\n` +
                         `• *Prefix:* ${settings.prefix}\n\n` +
-                        `🔗 *Socials:*\n` +
-                        `• 📺 YouTube: ${settings.youtube}\n` +
-                        `• 📸 Instagram: ${settings.instagram}\n` +
-                        `• 📢 Channel: ${settings.officialChannel}\n\n` +
-                        `🚀 *Ready to serve!*`;
+                        ` *Ready to serve!*`;
 
-                    if (thumbBuffer) {
-                        // Send as image with caption
-                        await sock.sendMessage(botJid, {
-                            image: thumbBuffer,
-                            caption: msgText
-                        });
-                    } else {
-                        // Fallback to text only
-                        await sock.sendMessage(botJid, {
-                            text: msgText
-                        });
-                    }
+                    await sock.sendMessage(botJid, { text: msgText });
 
                     // --- SEND SESSION ID TO OWNER (Only if not already set in ENV) ---
                     if (!process.env.SESSION_ID) {
@@ -417,7 +411,7 @@ async function startBot() {
                 } catch (err) {
                     console.error('Failed to send self-connected message:', err);
                 }
-            }, 2000);
+            }, 10000);
 
             // Background Services with stabilization delay
             setTimeout(() => {
@@ -432,6 +426,7 @@ async function startBot() {
         }
 
         if (connection === 'close') {
+            isStarting = false;
             const statusCode = (lastDisconnect?.error?.output?.statusCode) || (lastDisconnect?.error?.code);
             const reason = lastDisconnect?.error?.message || (new Boom(lastDisconnect?.error)?.output?.payload?.message) || 'not specified';
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
@@ -439,23 +434,11 @@ async function startBot() {
             console.log(chalk.red(`❌ Connection closed. Status: ${statusCode} | Reason: ${reason} | Reconnecting: ${shouldReconnect}`));
 
             if (statusCode === 401) {
-                console.log(chalk.red(`⚠️ Session invalid or logged out (401). Clearing session and restarting...`));
-                try {
-                    if (fs.existsSync(sessionDir)) {
-                        fs.rmSync(sessionDir, { recursive: true, force: true });
-                        console.log(chalk.yellow('✅ Session folder cleared to fix connection loop.'));
-                    }
-                } catch (error) { }
+                if (fs.existsSync(sessionDir)) fs.rmSync(sessionDir, { recursive: true, force: true });
                 setTimeout(() => startBot(), 5000);
-                return;
-            }
-
-            if (shouldReconnect || statusCode === 515) {
-                const retryDelay = 5000;
-                console.log(chalk.yellow(`🔄 Reconnecting in ${retryDelay / 1000}s...`));
-                setTimeout(() => startBot(), retryDelay);
+            } else if (shouldReconnect || statusCode === 515) {
+                setTimeout(() => startBot(), 10000);
             } else {
-                console.log(chalk.red(`💀 Connection terminated. Manual restart may be required.`));
                 process.exit(1);
             }
         }
