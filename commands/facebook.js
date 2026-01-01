@@ -118,18 +118,27 @@ async function sendVideo(sock, chatId, videoUrl, apiName, quoted, userLang) {
     } catch (e) {
         console.error('Error sending video URL, trying buffer:', e.message);
         try {
-            // Fallback: download to temp file with stream
             const tempDir = path.join(__dirname, '../temp');
             if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
             const tempFile = path.join(tempDir, `fb_${Date.now()}.mp4`);
 
             try {
+                // Check size before downloading (Stability)
+                const headRes = await axios.head(videoUrl, { timeout: 15000 }).catch(() => null);
+                const contentLength = headRes ? headRes.headers['content-length'] : null;
+                const maxSize = 250 * 1024 * 1024; // 250MB
+
+                if (contentLength && parseInt(contentLength) > maxSize) {
+                    throw new Error(`large_file:${(parseInt(contentLength) / 1024 / 1024).toFixed(2)}MB`);
+                }
+
                 const writer = fs.createWriteStream(tempFile);
                 const response = await axios({
                     url: videoUrl,
                     method: 'GET',
                     responseType: 'stream',
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    timeout: 600000
                 });
 
                 response.data.pipe(writer);
@@ -139,11 +148,8 @@ async function sendVideo(sock, chatId, videoUrl, apiName, quoted, userLang) {
                     writer.on('error', reject);
                 });
 
-                // Check size
                 const stats = fs.statSync(tempFile);
-                if (stats.size > 99 * 1024 * 1024) {
-                    throw new Error("File too large > 99MB");
-                }
+                if (stats.size > maxSize) throw new Error("large_file");
 
                 await sock.sendMessage(chatId, {
                     video: { url: tempFile },
@@ -152,11 +158,18 @@ async function sendVideo(sock, chatId, videoUrl, apiName, quoted, userLang) {
                 }, { quoted: quoted });
 
             } finally {
-                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                if (fs.existsSync(tempFile)) {
+                    try { fs.unlinkSync(tempFile); } catch (e) { }
+                }
             }
         } catch (bufferError) {
-            console.error('Buffer send failed:', bufferError);
-            throw new Error('Failed to send video');
+            console.error('Buffer send failed:', bufferError.message);
+            const isLarge = bufferError.message.includes('large_file');
+            const errorText = isLarge
+                ? (userLang === 'ma' ? "⚠️ *الفيديو كبير بزاف (أكثر من 250 ميجا).*" : "⚠️ *Video too large (> 250MB).*")
+                : (userLang === 'ma' ? "❌ *فشل تحميل الفيديو.*" : "❌ *Failed to send video.*");
+
+            await sock.sendMessage(chatId, { text: errorText }, { quoted: quoted });
         }
     }
 }
