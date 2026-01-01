@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     imagemagick \
     webp \
+    libreoffice \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create app directory

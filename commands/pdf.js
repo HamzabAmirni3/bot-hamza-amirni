@@ -138,34 +138,60 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
 
                 const buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: undefined, reuploadRequest: sock.updateMediaMessage });
 
-                // Upload to get URL
-                const { uploadFile } = require('../lib/uploader');
-                const fileUrl = await uploadFile(buffer); // Uses robust FileIO/Catbox
-
-                // Use robust API for Office conversion
-                const apiUrl = `https://api.vreden.my.id/api/office2pdf?url=${encodeURIComponent(fileUrl)}`;
-
-                const response = await require('axios').get(apiUrl, { responseType: 'arraybuffer' });
-
+                // Local Conversion with LibreOffice
                 const tempDir = path.join(process.cwd(), 'tmp');
                 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-                const tempFile = path.join(tempDir, `doc_${Date.now()}.pdf`);
-                fs.writeFileSync(tempFile, response.data);
 
-                await sock.sendMessage(chatId, {
-                    document: { url: tempFile },
-                    fileName: "converted_document.pdf",
-                    mimetype: "application/pdf",
-                    caption: "✅ Converted Successfully!"
-                }, { quoted: message });
+                // Determine extension based on mime
+                let ext = 'doc';
+                if (mime.includes('wordprocessingml')) ext = 'docx';
+                else if (mime.includes('spreadsheetml')) ext = 'xlsx';
+                else if (mime.includes('excel')) ext = 'xls';
+                else if (mime.includes('presentationml')) ext = 'pptx';
+                else if (mime.includes('powerpoint')) ext = 'ppt';
 
-                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+                const inputFilename = `input_${Date.now()}.${ext}`;
+                const inputFile = path.join(tempDir, inputFilename);
+                fs.writeFileSync(inputFile, buffer);
+
+                // LibreOffice Command
+                const { exec } = require('child_process');
+                // --outdir must be the directory, and result will have same name but .pdf
+                const cmd = `libreoffice --headless --convert-to pdf --outdir "${tempDir}" "${inputFile}"`;
+
+                await new Promise((resolve, reject) => {
+                    exec(cmd, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error('LibreOffice Error:', stderr);
+                            reject(error);
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+
+                const outputFilename = inputFilename.replace(`.${ext}`, '.pdf');
+                const outputFile = path.join(tempDir, outputFilename);
+
+                if (fs.existsSync(outputFile)) {
+                    await sock.sendMessage(chatId, {
+                        document: { url: outputFile },
+                        fileName: "converted_document.pdf",
+                        mimetype: "application/pdf",
+                        caption: "✅ Converted Successfully!"
+                    }, { quoted: message });
+
+                    fs.unlinkSync(inputFile);
+                    fs.unlinkSync(outputFile);
+                    await sock.sendMessage(chatId, { react: { text: "✅", key: message.key } });
+                } else {
+                    throw new Error("Output file not found after conversion");
+                }
                 return;
 
             } catch (e) {
                 console.error('Doc to PDF Error:', e);
-                const errMsg = userLang === 'ma' ? "❌ *فشل التحويل. تأكد من الملف.*" : "❌ *Conversion failed.*";
+                const errMsg = userLang === 'ma' ? "❌ *فشل التحويل. تأكد من الملف (Local Conversion).* " : "❌ *Conversion failed.*";
                 await sock.sendMessage(chatId, { text: errMsg }, { quoted: message });
                 return;
             }
