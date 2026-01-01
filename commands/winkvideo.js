@@ -6,6 +6,8 @@ const FormData = require("form-data")
 const fs = require("fs")
 const path = require("path")
 const { writeFileSync } = require('fs')
+const { t } = require('../lib/language');
+const settings = require('../settings');
 
 const resolutions = {
     "480": "480",
@@ -16,17 +18,17 @@ const resolutions = {
     "8k": "4320"
 }
 
-let handler = async (sock, chatId, msg, args) => {
+let handler = async (sock, chatId, msg, args, commands, userLang) => {
     sock.videohd = sock.videohd || {}
     const sender = msg.key.participant || msg.key.remoteJid;
 
     if (sender in sock.videohd) {
-        return sock.sendMessage(chatId, { text: "⏳ Please wait, your video is being processed." }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('video_ai.wait_processing', {}, userLang) }, { quoted: msg });
     }
 
     const text = args.join(" ");
     if (!text) {
-        return sock.sendMessage(chatId, { text: `Example usage:\n.winkvideo 1080 60fps` }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('video_ai.usage_wink', {}, userLang) }, { quoted: msg });
     }
 
     let [res, fpsText] = text?.trim().toLowerCase().split(" ")
@@ -35,21 +37,21 @@ let handler = async (sock, chatId, msg, args) => {
     if (fpsText && fpsText.endsWith("fps")) {
         fps = parseInt(fpsText.replace("fps", ""))
         if (isNaN(fps) || fps < 30 || fps > 240) {
-            return sock.sendMessage(chatId, { text: "❗ FPS must be between 30 and 240 (example: 60fps)" }, { quoted: msg });
+            return sock.sendMessage(chatId, { text: t('video_ai.error_fps', {}, userLang) }, { quoted: msg });
         }
     }
 
     const q = msg.quoted ? msg.quoted : msg
     const mime = (q.msg || q).mimetype || q.mediaType || ''
 
-    if (!/^video/.test(mime)) return sock.sendMessage(chatId, { text: "❗ Please reply to a video." }, { quoted: msg });
+    if (!/^video/.test(mime)) return sock.sendMessage(chatId, { text: t('video_ai.usage', {}, userLang) }, { quoted: msg });
 
     if (!resolutions[res]) {
-        return sock.sendMessage(chatId, { text: `Example usage:\n.winkvideo 720\n.winkvideo 1080 60fps` }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('video_ai.usage_wink', {}, userLang) }, { quoted: msg });
     }
 
     try {
-        await sock.sendMessage(chatId, { text: `⏳ Converting video to ${res.toUpperCase()} at ${fps}FPS...` }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('video_ai.converting', { res: res.toUpperCase(), fps }, userLang) }, { quoted: msg });
         const targetHeight = resolutions[res]
         const id = sender.split("@")[0]
 
@@ -92,7 +94,7 @@ let handler = async (sock, chatId, msg, args) => {
                 video: finalBuffer,
                 mimetype: 'video/mp4',
                 fileName: path.basename(outputPath),
-                caption: `✅ Video upgraded to ${res.toUpperCase()} ${fps}FPS`
+                caption: t('video_ai.caption', { res: res.toUpperCase(), botName: settings.botName }, userLang)
             }, { quoted: msg })
 
             delete sock.videohd[sender]
@@ -102,7 +104,7 @@ let handler = async (sock, chatId, msg, args) => {
 
     } catch (e) {
         if (sock.videohd && sender in sock.videohd) delete sock.videohd[sender]
-        return sock.sendMessage(chatId, { text: "❌ An error occurred: " + e.message }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('video_ai.error', {}, userLang) + `: ` + e.message }, { quoted: msg });
     }
 }
 

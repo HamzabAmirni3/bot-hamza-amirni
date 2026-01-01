@@ -1,8 +1,8 @@
-// instagram.com/noureddine_ouafy
-
-const axios = require('axios')
-const https = require('https')
-const FormData = require('form-data')
+const axios = require('axios');
+const https = require('https');
+const FormData = require('form-data');
+const { t } = require('../lib/language');
+const settings = require('../settings');
 
 class UnblurAI {
   constructor() {
@@ -48,7 +48,6 @@ class UnblurAI {
 
     const reqUrl = `${this.apiBase}${this.endpoints[mode]}`
 
-    // axios with form-data automatically sets headers if we pass the form
     const response = await axios.post(reqUrl, formData, {
       headers: { ...this.headers, ...formData.getHeaders() },
       httpsAgent: new https.Agent({ rejectUnauthorized: false, keepAlive: true }),
@@ -79,40 +78,45 @@ class UnblurAI {
   }
 }
 
-let handler = async (sock, chatId, msg, args) => {
+async function unblurCommand(sock, chatId, msg, args, commands, userLang) {
   let imageBuffer;
 
-  // 1. Check if user is replying to an image
-  let q = msg.quoted ? msg.quoted : msg;
-  let mime = (q.msg || q).mimetype || '';
-  if (/image/.test(mime)) {
-    imageBuffer = await q.download();
-  }
-  // 2. Check if user provided a URL
-  else if (args && args[0] && args[0].startsWith('http')) {
-    // Logic handled by the class via URL, but we can just pass URL to it.
-    // But passing buffer is easier for unified logic.
-    // Actually let's just pass what we have.
-  }
-  else {
-    return sock.sendMessage(chatId, { text: "⚠️ Please reply to an image or provide a valid image URL." }, { quoted: msg });
+  let quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ? {
+    message: msg.message.extendedTextMessage.contextInfo.quotedMessage,
+    key: {
+      remoteJid: chatId,
+      id: msg.message.extendedTextMessage.contextInfo.stanzaId,
+      participant: msg.message.extendedTextMessage.contextInfo.participant
+    }
+  } : msg;
+
+  const isImage = !!(quoted.message?.imageMessage || (quoted.message?.documentMessage && quoted.message.documentMessage.mimetype?.includes('image')));
+
+  if (isImage) {
+    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+    imageBuffer = await downloadMediaMessage(quoted, 'buffer', {}, { logger: undefined, reuploadRequest: sock.updateMediaMessage });
+  } else if (args && args[0] && args[0].startsWith('http')) {
+    // Handled by URL
+  } else {
+    return await sock.sendMessage(chatId, { text: t('unblur.help', {}, userLang) }, { quoted: msg });
   }
 
-  await sock.sendMessage(chatId, { text: "⏳ Enhancing image... please wait." }, { quoted: msg });
+  await sock.sendMessage(chatId, { text: t('unblur.wait', {}, userLang) }, { quoted: msg });
 
   const unblurAI = new UnblurAI()
   try {
     const result = await unblurAI.processImage({ url: args[0], buffer: imageBuffer, mode: "UNBLUR" })
-    if (!result.status) throw 'Failed to enhance image. Try again.'
-    await sock.sendFile(chatId, result.url, 'unblurred.png', '✅ Image Enhanced Successfully', msg)
+    if (!result.status) throw new Error('Processing failed');
+
+    await sock.sendMessage(chatId, {
+      image: { url: result.url },
+      caption: t('unblur.success', {}, userLang)
+    }, { quoted: msg });
+
   } catch (e) {
     console.error(e)
-    await sock.sendMessage(chatId, { text: '❌ Error processing image.' }, { quoted: msg });
+    await sock.sendMessage(chatId, { text: t('unblur.error', {}, userLang) }, { quoted: msg });
   }
 }
 
-handler.help = ['unblur']
-handler.tags = ['ai']
-handler.command = /^unblur$/i
-handler.limit = true;
-module.exports = handler;
+module.exports = unblurCommand;

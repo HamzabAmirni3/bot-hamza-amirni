@@ -49,13 +49,13 @@ async function apkCommand(sock, chatId, message, args, commands, userLang) {
         const sizeMB = (app.size / (1024 * 1024)).toFixed(2);
 
         // Large file warning (WhatsApp has limits)
-        if (parseFloat(sizeMB) > 100) {
+        if (parseFloat(sizeMB) > 300) {
             await sock.sendMessage(chatId, { react: { text: "⚠️", key: message.key } });
             const largeMsg = userLang === 'ma'
                 ? `⚠️ *التطبيق كبير بزاف (${sizeMB} MB). ما نقدرش نصيفطو.*`
                 : userLang === 'ar'
-                    ? `⚠️ *حجم التطبيق كبير جداً (${sizeMB} MB). الحد الأقصى 100 ميجا.*`
-                    : `⚠️ *App too large (${sizeMB} MB). Limit is 100MB.*`;
+                    ? `⚠️ *حجم التطبيق كبير جداً (${sizeMB} MB). الحد الأقصى 300 ميجا.*`
+                    : `⚠️ *App too large (${sizeMB} MB). Limit is 300MB.*`;
             return await sendWithChannelButton(sock, chatId, largeMsg, message);
         }
 

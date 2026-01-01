@@ -1,27 +1,18 @@
 const axios = require('axios');
-const { sendWithChannelButton } = require('../lib/channelButton');
+const { t } = require('../lib/language');
 const settings = require('../settings');
 
-async function aiCheckCommand(sock, chatId, msg, args) {
+async function aiCheckCommand(sock, chatId, msg, args, commands, userLang) {
     const text = args.join(' ').trim();
 
     if (!text) {
-        const helpMsg = `🔍 *كاشف الذكاء الاصطناعي (AI Checker)* 🔍
-
-🔹 *الاستخدام:*
-${settings.prefix}aicheck [النص المراد فحصه]
-
-📝 *مثال:*
-${settings.prefix}aicheck Hello, how are you today?
-
-💡 هذا الأمر يستخدم تقنية Turnitin لكشف ما إذا كان النص مكتوباً بواسطة ذكاء اصطناعي أم بشري.
-
-⚔️ ${settings.botName}`;
-        return await sendWithChannelButton(sock, chatId, helpMsg, msg);
+        return await sock.sendMessage(chatId, { text: t('aicheck.help', { prefix: settings.prefix, botName: settings.botName }, userLang) }, { quoted: msg });
     }
 
     try {
         await sock.sendMessage(chatId, { react: { text: "🧠", key: msg.key } });
+
+        await sock.sendMessage(chatId, { text: t('aicheck.wait', {}, userLang) }, { quoted: msg });
 
         const res = await axios.post(
             'https://reilaa.com/api/turnitin-match',
@@ -37,19 +28,19 @@ ${settings.prefix}aicheck Hello, how are you today?
         const data = res.data;
 
         if (!data || !data.reilaaResult?.value) {
-            throw new Error('لم يتم العثور على نتائج للفحص 😭');
+            throw new Error('No results found.');
         }
 
         const result = data.reilaaResult.value;
 
-        const output = `✨ *نتيجة فحص الذكاء الاصطناعي* ✨
+        const output = `${t('aicheck.result_title', {}, userLang)}
 
-🧠 *التصنيف:* ${result.classification === 'AI' ? 'ذكاء اصطناعي 🤖' : 'بشري 👤'}
-🎯 *نسبة الذكاء:* ${result.aiScore}%
-⚠️ *المخاطر:* ${result.details.analysis.risk}
-💡 *اقتراح:* ${result.details.analysis.suggestion}
+${t('aicheck.classification', {}, userLang)} ${result.classification === 'AI' ? t('aicheck.ai', {}, userLang) : t('aicheck.human', {}, userLang)}
+${t('aicheck.score', {}, userLang)} ${result.aiScore}%
+${t('aicheck.risk', {}, userLang)} ${result.details.analysis.risk}
+${t('aicheck.suggestion', {}, userLang)} ${result.details.analysis.suggestion}
 
-📄 *النص المفحوص:*
+📄 *Text Snippet:*
 "${result.inputText.length > 500 ? result.inputText.substring(0, 500) + '...' : result.inputText}"
 
 ⚔️ ${settings.botName}`.trim();
@@ -60,7 +51,7 @@ ${settings.prefix}aicheck Hello, how are you today?
     } catch (err) {
         console.error('Error in AI Check:', err);
         await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-        await sendWithChannelButton(sock, chatId, `❌ حدث خطأ أثناء فحص النص.\n⚠️ السبب: ${err.response?.data?.message || err.message}`, msg);
+        await sock.sendMessage(chatId, { text: t('aicheck.error', {}, userLang) + `\n⚠️ ${err.response?.data?.message || err.message}` }, { quoted: msg });
     }
 }
 

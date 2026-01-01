@@ -1,6 +1,7 @@
 const axios = require("axios");
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const { sendWithChannelButton } = require('../lib/channelButton');
+const { t } = require('../lib/language');
 const settings = require('../settings');
 
 class PhotoEnhancer {
@@ -97,27 +98,7 @@ async function aiEnhanceCommand(sock, chatId, msg, args, commands, userLang) {
         const isViewOnce = !!(quoted.message?.viewOnceMessage?.message?.imageMessage || quoted.message?.viewOnceMessageV2?.message?.imageMessage);
 
         if (!isImage && !isViewOnce) {
-            const helpMsg = `❌ *AI Enhance - Usage Guide*
-
-You must reply to an image to use this feature.
-
-📌 *How to use:*
-1. Send or receive an image
-2. Reply to the image
-3. Type one of the commands below
-
-✨ *Available Commands*
-• ${settings.prefix}ai-enhance → Enhance image quality
-• ${settings.prefix}ai-enhance bg → Remove background
-• ${settings.prefix}ai-enhance upscale → Upscale image to 4K
-
-📝 *Example*
-Reply to an image and type:
-${settings.prefix}ai-enhance
-
-⚠️ Notes:
-• Processing takes 5–15 seconds`;
-            return await sendWithChannelButton(sock, chatId, helpMsg, msg, {}, userLang);
+            return await sock.sendMessage(chatId, { text: t('ai_enhance.help', { prefix: settings.prefix }, userLang) }, { quoted: msg });
         }
 
         const text = args.join(' ').toLowerCase();
@@ -127,13 +108,7 @@ ${settings.prefix}ai-enhance
         if (text.includes("upscale")) type = "upscale";
 
         await sock.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
-        const waitMsg = userLang === 'ma'
-            ? "⏳ *الذكاء كيخدم على التصويرة، صبر...*"
-            : userLang === 'ar'
-                ? "⏳ *جارٍ معالجة الصورة، يرجى الانتظار...*"
-                : "⏳ *AI is processing your image, please wait...*";
-
-        await sendWithChannelButton(sock, chatId, waitMsg, msg, {}, userLang);
+        await sock.sendMessage(chatId, { text: t('ai_enhance.wait', {}, userLang) }, { quoted: msg });
 
         const buffer = await downloadMediaMessage(quoted, 'buffer', {}, {
             logger: undefined,
@@ -151,22 +126,16 @@ ${settings.prefix}ai-enhance
 
         if (!result) throw new Error("Failed to process image.");
 
-        const caption = userLang === 'ma'
-            ? "✅ *العملية سالات!* (Enhanced)\n\n✨ تم تحسين الصورة بنجاح."
-            : userLang === 'ar'
-                ? "✅ *تمت العملية!* (Enhanced)\n\n✨ تم تحسين الصورة بنجاح."
-                : "✅ *Process Completed!* (Enhanced)\n\n✨ Image enhanced successfully.";
-
         await sock.sendMessage(chatId, {
             image: { url: result },
-            caption: caption
+            caption: t('ai_enhance.success', {}, userLang)
         }, { quoted: msg });
 
         await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
 
     } catch (e) {
         console.error('AI Enhance Error:', e);
-        await sock.sendMessage(chatId, { text: `❌ Failed: ${e.message}` }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('ai_enhance.error', {}, userLang) + `\n⚠️ ${e.message}` }, { quoted: msg });
         await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
     }
 }

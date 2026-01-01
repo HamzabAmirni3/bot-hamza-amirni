@@ -27,11 +27,36 @@ async function ytplayCommand(sock, chatId, msg, args) {
         // Step 2: React while fetching link
         await sock.sendMessage(chatId, { react: { text: "📥", key: msg.key } });
 
-        const apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(videoUrl)}`;
-        const response = await axios.get(apiUrl, { timeout: 60000 });
-        const data = response.data?.result;
+        // Multi-API Download System
+        let audioUrl = null;
+        let finalTitle = "yt-audio";
 
-        if (!data || !data.download_url) {
+        try {
+            const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`;
+            const response = await axios.get(apiUrl, { timeout: 45000 });
+            if (response.data && response.data.status) {
+                audioUrl = response.data.audio;
+                finalTitle = response.data.title || finalTitle;
+            }
+        } catch (e) {
+            console.log('[ytplay.js] Primary API failed, trying Vreden fallback:', e.message);
+        }
+
+        // Fallback to Vreden
+        if (!audioUrl) {
+            try {
+                const vredenUrl = `https://api.vreden.my.id/api/ytmp3?url=${encodeURIComponent(videoUrl)}`;
+                const vResponse = await axios.get(vredenUrl, { timeout: 30000 });
+                if (vResponse.data && vResponse.data.status) {
+                    audioUrl = vResponse.data.result.download;
+                    finalTitle = vResponse.data.result.title || finalTitle;
+                }
+            } catch (ve) {
+                console.log('[ytplay.js] Vreden fallback also failed:', ve.message);
+            }
+        }
+
+        if (!audioUrl) {
             await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
             return await sock.sendMessage(chatId, { text: "❌ فشل جلب الصوت. حاول مرة أخرى." }, { quoted: msg });
         }
@@ -40,10 +65,10 @@ async function ytplayCommand(sock, chatId, msg, args) {
         await sock.sendMessage(chatId, { react: { text: "🎶", key: msg.key } });
 
         await sock.sendMessage(chatId, {
-            audio: { url: data.download_url },
+            audio: { url: audioUrl },
             mimetype: "audio/mpeg",
             ptt: false,
-            fileName: `${data.title || "yt-audio"}.mp3`
+            fileName: `${finalTitle}.mp3`
         }, { quoted: msg });
 
         // Final ✅ reaction

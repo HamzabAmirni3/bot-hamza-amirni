@@ -15,7 +15,7 @@
             "news": "📡 News",
             "new": "🔥 New Commands"
         },
-        "footer": "© Hamza Amirni 2025"
+        "footer": "© Hamza Amirni 2026"
     },
     "command_desc": {
         "ai": "Ask AI assistant (GPT-5)",
@@ -292,6 +292,31 @@
         "veo3_result": "✨ *VEO3 Prompt Result:*\n\n{answer}\n\n⚔️ {botName}",
         "veo3_error": "❌ Failed to generate prompt.\n⚠️ Reason: {error}"
     },
+    "video_ai": {
+        "usage": "📌 Please send or reply to a video with this command to enhance it.",
+        "usage_wink": "📌 *Usage:*\n.winkvideo [resolution] [fps]\n\n📝 *Example:*\n.winkvideo 1080 60fps\n\n*Available Resolutions:* 720, 1080, 2k, 4k",
+        "wait": "✅ Video received. Starting the upscale process...",
+        "wait_processing": "⏳ Please wait, your video is being processed by the server.",
+        "uploading": "⬆️ Video successfully uploaded. Starting conversion job...",
+        "job_created": "⏳ Job created. Waiting for results... (Max 5 minutes)",
+        "converting": "⏳ Converting video to {res} at {fps}FPS...",
+        "success": "✅ Job finished. Sending the upscaled video...",
+        "caption": "🌟 **Video Upscale Successful!**\n\nResolution: {res}\n⚔️ {botName}",
+        "error_fps": "❗ FPS must be between 30 and 240 (example: 60fps)",
+        "error": "❌ An error occurred during video enhancement."
+    },
+    "brat_vd": {
+        "usage": "📌 Please send text after the command.\nExample: .brat-vd Hello World",
+        "wait": "⏳ Creating your video... Please wait a moment.",
+        "success": "📽️ Video created successfully!",
+        "error": "❌ An error occurred while creating the video."
+    },
+    "ai_enhance": {
+        "help": "❌ *AI Enhance - Usage Guide*\n\nYou must reply to an image to use this feature.\n\n📌 *How to use:*\n1. Send or receive an image\n2. Reply to the image\n3. Type one of the commands below\n\n✨ *Available Commands*\n• {prefix}ai-enhance → Enhance image quality\n• {prefix}ai-enhance bg → Remove background\n• {prefix}ai-enhance upscale → Upscale image to 4K\n\n📝 *Example*\nReply to an image and type:\n{prefix}ai-enhance\n\n⚠️ Notes:\n• Processing takes 5–15 seconds",
+        "wait": "⏳ *AI is processing your image, please wait...*",
+        "success": "✅ *Process Completed!* (Enhanced)\n\n✨ Image enhanced successfully.",
+        "error": "❌ Failed to process image."
+    },
     "moderation": {
         "ban_usage": "❌ Please mention the user or reply to their message to ban them from the bot!",
         "ban_success": "✅ User @{user} has been banned from the bot!",
@@ -398,5 +423,70 @@
         "converting_text": "🔄 Converting text to PDF...",
         "success_text": "✅ Text converted to PDF successfully!\n\n⚔️ {botName}",
         "error_text": "❌ Failed to convert text."
+    },
+    "wallpaper4k": {
+        "help": "📌 *4kwallpaper Instructions*:\n\n✅ By category:\n• .4kwallpaper popular\n• .4kwallpaper featured\n• .4kwallpaper random\n• .4kwallpaper collection\n\n🔍 Search:\n• .4kwallpaper search nature\n\n📥 Download:\n• .4kwallpaper dl [URL]",
+        "searching": "🔎 Searching for: {query}...",
+        "preparing": "⏳ Preparing high resolution wallpaper...",
+        "error_no_res": "❌ Could not find direct download link.",
+        "success_caption": "✅ *{title}*\n\n🖥 Resolution: {res}\n⚔️ {botName}"
+    },
+    "faceswap": {
+        "help": "🎭 *Face Swap* 🎭\n\n🔹 *Usage:*\n1. Send source image.\n2. Reply to it with target image + {prefix}faceswap.\n\n💡 Results are better with clear faces.",
+        "error_dual": "❌ Please reply to an image with another image to perform face swap.",
+        "wait": "⏳ *Swapping faces...* Please wait.",
+        "success": "✅ *Face Swap Successful!*",
+        "error": "❌ Face swap failed: {error}"
+    },
+    "remini": {
+        "wait": "⏳ *Enhancing image quality (Remini)...*",
+        "error_no_api": "❌ Sorry, this feature requires a paid API key currently.",
+        "error": "❌ Error enhancing image."
+    },
+    "unblur": {
+        "help": "⚠️ Please reply to an image or provide a valid image URL.",
+        "wait": "⏳ Enhancing image... please wait.",
+        "success": "✅ Image Enhanced Successfully",
+        "error": "❌ Error processing image."
+    },
+    "removebg": {
+        "help": "📷 Please reply with an image and use {prefix}removebg",
+        "success": "✅ Background removed successfully!",
+        "error": "❌ Error removing background."
+    },
+    "ai_image": {
+        "help": "🎨 *AI Image Generation* 🎨\n\n🔹 *Usage:*\n{prefix}ai-image [Prompt]\n\n📝 *Example:*\n{prefix}ai-image astronaut cat",
+        "wait": "🎨 *Generating image, please wait...*",
+        "success": "✅ *Image Generated Successfully!*\n\n📝 *Prompt:* {text}\n\n⚔️ {botName}"
+    },
+    "ai_img_edit": {
+        "help": "🎨 *AI Image Editor* 🎨\n\n🔹 *Usage:*\n1️⃣ Reply to an image:\n   {prefix}ai-img-edit make them wear glasses\n\n2️⃣ Or use link:\n   {prefix}ai-img-edit [Link] | [Prompt]",
+        "wait": "⏳ *Uploading and processing image...*",
+        "success": "✅ *Image Edited Successfully!*\n📝 *Prompt:* {prompt}\n\n⚔️ {botName}",
+        "error_link": "❌ Please provide a valid image link or reply to an image."
+    },
+    "colorize": {
+        "help": "🎨 *AI Image Colorizer*\n\nThis feature uses AI to restore and colorize black & white photos.\n\n🧑‍💻 HOW TO USE\n1️⃣ Reply to a black & white image\n2️⃣ Send the command: {prefix}colorize",
+        "wait": "🎨 *Colorizing image, please wait...*",
+        "success": "✅ *Process Completed!* (Colorized)\n\n🎨 Image colorized successfully.",
+        "error": "❌ Failed to colorize image."
+    },
+    "deepseek": {
+        "help": "🔍 Please provide a query for Deepseek.\nExample: .deepseek how to bake a cake",
+        "error": "❌ Deepseek failed. Try again later."
+    },
+    "aicheck": {
+        "help": "🔍 *AI Checker* 🔍\n\n🔹 *Usage:* {prefix}aicheck [Text to check]\n\n💡 This uses Turnitin to detect if text is AI generated.\n\n⚔️ {botName}",
+        "wait": "⏳ Checking text for AI content...",
+        "result_title": "✨ *AI Content Report* ✨",
+        "classification": "🧠 *Classification:*",
+        "human": "Human 👤",
+        "human_val": "Human 👤",
+        "ai": "AI Generated 🤖",
+        "ai_val": "AI Generated 🤖",
+        "score": "🎯 *AI Score:*",
+        "risk": "⚠️ *Risk Level:*",
+        "suggestion": "💡 *Suggestion:*",
+        "error": "❌ Error during check."
     }
 }

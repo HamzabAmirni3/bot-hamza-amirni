@@ -1,6 +1,7 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const settings = require('../settings');
+const { t } = require('../lib/language');
 
 class Wallpaper {
     constructor() {
@@ -72,28 +73,13 @@ class Wallpaper {
     }
 }
 
-async function wallpaper4kCommand(sock, chatId, msg, args) {
+async function wallpaper4kCommand(sock, chatId, msg, args, commands, userLang) {
     const wallpaper = new Wallpaper();
     const type = args[0] ? args[0].toLowerCase() : null;
 
     if (!type) {
         return sock.sendMessage(chatId, {
-            text: `📌 *كيفية استخدام أمر 4kwallpaper*:
-
-✅ لعرض الخلفيات حسب التصنيف:
-• .4kwallpaper popular
-• .4kwallpaper featured
-• .4kwallpaper random
-• .4kwallpaper collection
-
-🔍 للبحث عن خلفية:
-• .4kwallpaper search nature
-• .4kwallpaper search car
-
-📥 لتحميل الخلفية وإرسالها:
-• .4kwallpaper dl [الرابط]
-
-✳️ ملاحظة: البوت سيقوم بتحميل الصورة بأعلى دقة وإرسالها لك مباشرة.`
+            text: t('wallpaper4k.help', { prefix: settings.prefix }, userLang)
         }, { quoted: msg });
     }
 
@@ -102,7 +88,7 @@ async function wallpaper4kCommand(sock, chatId, msg, args) {
             let targetUrl = `${wallpaper.base}/${type === 'popular' ? 'most-popular-4k-wallpapers/' : type === 'featured' ? 'best-4k-wallpapers/' : type === 'random' ? 'random-wallpapers/' : 'collections-packs/'}`;
             let { data } = await axios.get(targetUrl, { headers: wallpaper.headers });
             const $ = cheerio.load(data);
-            let resultText = `🌆 *خلفيات (${type})*\n\n`;
+            let resultText = `🌆 *4K Wallpapers (${type.toUpperCase()})*\n\n`;
             let count = 0;
             $('div#pics-list .wallpapers__item').each((i, e) => {
                 if (count < 5) {
@@ -110,54 +96,54 @@ async function wallpaper4kCommand(sock, chatId, msg, args) {
                     count++;
                 }
             });
-            resultText += `📥 لتحميل أي واحدة، أرسل:\n.4kwallpaper dl [الرابط]`;
+            resultText += t('command_desc.remini', {}, userLang).includes('Explain') ? "📥 To download, send:\n.4kwallpaper dl [URL]" : "📥 لتحميل أي واحدة، أرسل:\n.4kwallpaper dl [الرابط]";
+            // Simplified fallback for common instruction part if not in json explicitly as dynamic
             return sock.sendMessage(chatId, { text: resultText }, { quoted: msg });
         }
 
         if (type === 'search') {
             if (!args[1]) {
-                return sock.sendMessage(chatId, { text: `❌ أكتب كلمة للبحث.\nمثال: .4kwallpaper search ocean` }, { quoted: msg });
+                return sock.sendMessage(chatId, { text: t('ai.provide_prompt', {}, userLang) }, { quoted: msg });
             }
             let query = args.slice(1).join(' ');
-            await sock.sendMessage(chatId, { text: `🔎 جاري البحث عن: ${query}...` }, { quoted: msg });
+            await sock.sendMessage(chatId, { text: t('wallpaper4k.searching', { query }, userLang) }, { quoted: msg });
             let data = await wallpaper.search(query);
             if (typeof data === 'string') return sock.sendMessage(chatId, { text: data }, { quoted: msg });
 
-            let resultText = `🔎 *نتائج البحث عن:* ${query}\n\n`;
+            let resultText = `🔎 *Search Results:* ${query}\n\n`;
             data.slice(0, 5).forEach((item, i) => {
                 resultText += `*${i + 1}. ${item.title}*\n🔗 ${item.url}\n\n`;
             });
-            resultText += `📥 لتحميل أي واحدة، أرسل:\n.4kwallpaper dl [الرابط]`;
+            resultText += "📥 .4kwallpaper dl [URL]";
             return sock.sendMessage(chatId, { text: resultText }, { quoted: msg });
         }
 
         if (type === 'dl') {
-            if (!args[1]) return sock.sendMessage(chatId, { text: '❌ أرسل رابط خلفية صالح.' }, { quoted: msg });
+            if (!args[1]) return sock.sendMessage(chatId, { text: t('ai_enhance.help', { prefix: settings.prefix }, userLang) }, { quoted: msg });
 
-            await sock.sendMessage(chatId, { text: '⏳ جاري تحضير الخلفية بأعلى دقة... انتظر قليلاً.' }, { quoted: msg });
+            await sock.sendMessage(chatId, { text: t('wallpaper4k.preparing', {}, userLang) }, { quoted: msg });
 
             let data = await wallpaper.download(args[1]);
             if (typeof data === 'string') return sock.sendMessage(chatId, { text: data }, { quoted: msg });
 
-            // Try to get the highest resolution desktop wallpaper
             let bestRes = data.image.desktop[0] || data.image.mobile[0] || data.image.tablet[0];
 
             if (!bestRes) {
-                return sock.sendMessage(chatId, { text: '❌ لم نتمكن من العثور على رابط تحميل مباشر.' }, { quoted: msg });
+                return sock.sendMessage(chatId, { text: t('wallpaper4k.error_no_res', {}, userLang) }, { quoted: msg });
             }
 
             await sock.sendMessage(chatId, {
                 image: { url: bestRes.url },
-                caption: `✅ *${data.title}*\n\n🖥 الدقة: ${bestRes.res}\n⚔️ *Hamza Amirni Bot*`
+                caption: t('wallpaper4k.success_caption', { title: data.title, res: bestRes.res, botName: settings.botName }, userLang)
             }, { quoted: msg });
             return;
         }
 
-        return sock.sendMessage(chatId, { text: '❌ أمر غير معروف. أرسل `.4kwallpaper` للتعليمات.' }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('common.error_generic', {}, userLang) }, { quoted: msg });
 
     } catch (error) {
         console.error('Wallpaper Error:', error);
-        return sock.sendMessage(chatId, { text: '❌ حدث خطأ أثناء العمل على طلبك.' }, { quoted: msg });
+        return sock.sendMessage(chatId, { text: t('ai.error', {}, userLang) }, { quoted: msg });
     }
 }
 

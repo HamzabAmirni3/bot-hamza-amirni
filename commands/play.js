@@ -34,12 +34,36 @@ module.exports = async (sock, chatId, msg, args, commands, userLang) => {
         }, { quoted: msg });
 
         // 4. Download Audio
-        // Using the API from ytplay.js as it seems reliable
-        const apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(videoUrl)}`;
-        const response = await axios.get(apiUrl, { timeout: 60000 });
-        const data = response.data?.result;
+        // Using robust multi-API system
+        let audioUrl = null;
+        let finalTitle = video.title;
 
-        if (!data || !data.download_url) {
+        try {
+            const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`;
+            const response = await axios.get(apiUrl, { timeout: 45000 });
+            if (response.data && response.data.status) {
+                audioUrl = response.data.audio;
+                finalTitle = response.data.title || finalTitle;
+            }
+        } catch (e) {
+            console.log('[play.js] Primary API failed, trying Vreden fallback:', e.message);
+        }
+
+        // Fallback to Vreden
+        if (!audioUrl) {
+            try {
+                const vredenUrl = `https://api.vreden.my.id/api/ytmp3?url=${encodeURIComponent(videoUrl)}`;
+                const vResponse = await axios.get(vredenUrl, { timeout: 30000 });
+                if (vResponse.data && vResponse.data.status) {
+                    audioUrl = vResponse.data.result.download;
+                    finalTitle = vResponse.data.result.title || finalTitle;
+                }
+            } catch (ve) {
+                console.log('[play.js] Vreden fallback also failed:', ve.message);
+            }
+        }
+
+        if (!audioUrl) {
             return await sock.sendMessage(chatId, {
                 text: t('play.error_api', {}, userLang)
             }, { quoted: msg });
@@ -49,12 +73,12 @@ module.exports = async (sock, chatId, msg, args, commands, userLang) => {
         await sock.sendMessage(chatId, { react: { text: "⬆️", key: msg.key } });
 
         await sock.sendMessage(chatId, {
-            audio: { url: data.download_url },
+            audio: { url: audioUrl },
             mimetype: "audio/mpeg",
-            fileName: `${data.title || video.title}.mp3`,
+            fileName: `${finalTitle}.mp3`,
             contextInfo: {
                 externalAdReply: {
-                    title: data.title || video.title,
+                    title: finalTitle,
                     body: video.author?.name || "Queen Riam Music",
                     thumbnailUrl: video.thumbnail,
                     sourceUrl: videoUrl,

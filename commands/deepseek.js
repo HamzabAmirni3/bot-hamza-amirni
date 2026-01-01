@@ -1,10 +1,12 @@
 const axios = require("axios");
+const { t } = require('../lib/language');
+const settings = require('../settings');
 
 async function deepseekCommand(sock, chatId, message, args, commands, userLang) {
     try {
         const query = (Array.isArray(args) ? args.join(' ') : args) || "";
         if (!query.trim()) {
-            return await sock.sendMessage(chatId, { text: "🔍 Please provide a query for Deepseek.\nExample: .deepseek how to bake a cake" }, { quoted: message });
+            return await sock.sendMessage(chatId, { text: t('deepseek.help', {}, userLang) }, { quoted: message });
         }
 
         // React with 🤖 while processing
@@ -13,7 +15,6 @@ async function deepseekCommand(sock, chatId, message, args, commands, userLang) 
         });
 
         const apiUrl = `https://all-in-1-ais.officialhectormanuel.workers.dev/?query=${encodeURIComponent(query)}&model=deepseek`;
-
 
         const response = await axios.get(apiUrl);
 
@@ -25,7 +26,7 @@ async function deepseekCommand(sock, chatId, message, args, commands, userLang) 
         }
     } catch (error) {
         console.error("Deepseek API Error:", error.message);
-        await sock.sendMessage(chatId, { text: "❌ Deepseek failed. Try again later." }, { quoted: message });
+        await sock.sendMessage(chatId, { text: t('deepseek.error', {}, userLang) }, { quoted: message });
     }
 }
 

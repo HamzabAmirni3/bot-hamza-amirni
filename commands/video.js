@@ -55,26 +55,56 @@ async function videoCommand(sock, chatId, msg, args, commands, userLang) {
         await sock.sendMessage(chatId, { text: dlMsg }, { quoted: msg });
         await sock.sendMessage(chatId, { react: { text: '⏳', key: msg.key } });
 
-        // Use new API (Hamza Amirni's)
-        const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`;
-        const response = await axios.get(apiUrl, { headers: { 'Accept': 'application/json' } });
+        // Use primary API (Hamza Amirni's Official Worker)
+        let videoDownloadUrl = null;
+        let title = previewTitle || 'video.mp4';
+        let thumbnail = previewThumbnail;
+        let quality = "360p";
 
-        if (response.status !== 200 || !response.data.status) {
+        try {
+            const apiUrl = `https://yt-dl.officialhectormanuel.workers.dev/?url=${encodeURIComponent(videoUrl)}`;
+            const response = await axios.get(apiUrl, { headers: { 'Accept': 'application/json' }, timeout: 30000 });
+
+            if (response.data && response.data.status) {
+                const data = response.data;
+                title = data.title || title;
+                thumbnail = data.thumbnail || thumbnail;
+                // Prefer 360p, fallback to what's available
+                videoDownloadUrl = data.videos["360"] || data.videos["480"] || data.videos["720"] || Object.values(data.videos)[0];
+            }
+        } catch (e) {
+            console.log('[video.js] Primary API failed, trying Vreden fallback:', e.message);
+        }
+
+        // Fallback to Vreden API if primary failed
+        if (!videoDownloadUrl) {
+            try {
+                const vredenUrl = `https://api.vreden.my.id/api/ytmp4?url=${encodeURIComponent(videoUrl)}`;
+                const vResponse = await axios.get(vredenUrl, { timeout: 30000 });
+                if (vResponse.data && vResponse.data.status) {
+                    const vData = vResponse.data.result;
+                    videoDownloadUrl = vData.download;
+                    title = vData.title || title;
+                }
+            } catch (ve) {
+                console.log('[video.js] Vreden fallback also failed:', ve.message);
+            }
+        }
+
+        if (!videoDownloadUrl) {
             await sock.sendMessage(chatId, { text: t('download.yt_error', {}, userLang) }, { quoted: msg });
+            await sock.sendMessage(chatId, { react: { text: '❌', key: msg.key } });
             return;
         }
 
-        const data = response.data;
-        const title = data.title || previewTitle || 'video.mp4';
-        const thumbnail = data.thumbnail || previewThumbnail;
-        const quality = "360p";
-        const videoDownloadUrl = data.videos["360"]; // use 360 quality link
         const filename = `${title.replace(/[^a-zA-Z0-9-_\.]/g, '_')}.mp4`;
 
         // Send preview before downloading
         const prevMsg = userLang === 'ma'
             ? `🎬 *لقيتها!* دابا غانصيفطها ليك...\n📌 *العنوان:* ${title}`
-            : `🎬 *Found it!* Sending now...\n📌 *Title:* ${title}`;
+            : userLang === 'ar'
+                ? `🎬 *تم العثور عليه!* جاري الإرسال...\n📌 *العنوان:* ${title}`
+                : `🎬 *Found it!* Sending now...\n📌 *Title:* ${title}`;
 
         await sock.sendMessage(chatId, {
             image: { url: thumbnail },
@@ -123,7 +153,7 @@ async function videoCommand(sock, chatId, msg, args, commands, userLang) {
             // Check content-length header first
             const headRes = await axios.head(videoDownloadUrl);
             const contentLength = headRes.headers['content-length'];
-            if (contentLength && parseInt(contentLength) > 100 * 1024 * 1024) { // 100MB limit
+            if (contentLength && parseInt(contentLength) > 250 * 1024 * 1024) { // Increased to 250MB
                 await sock.sendMessage(chatId, { text: t('download.yt_large', {}, userLang) }, { quoted: msg });
                 return;
             }
@@ -144,7 +174,7 @@ async function videoCommand(sock, chatId, msg, args, commands, userLang) {
             });
 
             const stats = fs.statSync(tempFile);
-            const maxSize = 100 * 1024 * 1024; // 100MB limit hard check
+            const maxSize = 250 * 1024 * 1024; // Increased to 250MB
             if (stats.size > maxSize) {
                 fs.unlinkSync(tempFile); // Delete immediately if too big
                 await sock.sendMessage(chatId, { text: t('download.yt_large', {}, userLang) }, { quoted: msg });

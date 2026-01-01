@@ -1,8 +1,8 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const { sendWithChannelButton } = require('../lib/channelButton');
 const settings = require('../settings');
+const { t } = require('../lib/language');
 
 class ImageColorizer {
     constructor() {
@@ -113,55 +113,13 @@ async function colorizeCommand(sock, chatId, msg, args, commands, userLang) {
         const isViewOnce = !!(quoted.message?.viewOnceMessage?.message?.imageMessage || quoted.message?.viewOnceMessageV2?.message?.imageMessage);
 
         if (!isImage && !isViewOnce) {
-            const helpMsg = `🎨 *AI Image Colorizer*
-
-This feature uses AI to restore and colorize black & white photos.
-
-━━━━━━━━━━━━━━━━━━
-🧑‍💻 HOW TO USE
-━━━━━━━━━━━━━━━━━━
-1️⃣ Reply to a black & white image
-2️⃣ Send the command:
-${settings.prefix}colorize
-
-Optional:
-${settings.prefix}colorize <custom prompt>
-
-━━━━━━━━━━━━━━━━━━
-📂 SUPPORTED INPUT
-━━━━━━━━━━━━━━━━━━
-• JPG / JPEG
-• PNG
-• Black & white photos
-• Old photos
-
-━━━━━━━━━━━━━━━━━━
-📝 EXAMPLES
-━━━━━━━━━━━━━━━━━━
-.colorize
-.colorize realistic colors
-.colorize vintage style
-
-━━━━━━━━━━━━━━━━━━
-⚠️ NOTES
-━━━━━━━━━━━━━━━━━━
-• One image per command
-• Processing takes 10–30 seconds
-• Works best on clear faces
-• Daily usage limits may apply`;
-            return await sendWithChannelButton(sock, chatId, helpMsg, msg, {}, userLang);
+            return await sock.sendMessage(chatId, { text: t('colorize.help', { prefix: settings.prefix }, userLang) }, { quoted: msg });
         }
 
         const userPrompt = args.join(" ");
 
         await sock.sendMessage(chatId, { react: { text: "🎨", key: msg.key } });
-        const waitMsg = userLang === 'ma'
-            ? "🎨 *كنلون فالتصويرة، بلاتي...*"
-            : userLang === 'ar'
-                ? "🎨 *جارٍ تلوين الصورة، يرجى الانتظار...*"
-                : "🎨 *Colorizing image, please wait...*";
-
-        await sendWithChannelButton(sock, chatId, waitMsg, msg, {}, userLang);
+        await sock.sendMessage(chatId, { text: t('colorize.wait', {}, userLang) }, { quoted: msg });
 
         const buffer = await downloadMediaMessage(quoted, 'buffer', {}, {
             logger: undefined,
@@ -173,15 +131,9 @@ ${settings.prefix}colorize <custom prompt>
         const api = new ImageColorizer();
         const resultUrl = await api.generate(buffer, userPrompt);
 
-        const caption = userLang === 'ma'
-            ? "✅ *العملية سالات!* (Colorized)\n\n🎨 تم تلوين الصورة بنجاح."
-            : userLang === 'ar'
-                ? "✅ *تمت العملية!* (Colorized)\n\n🎨 تم تلوين الصورة بنجاح."
-                : "✅ *Process Completed!* (Colorized)\n\n🎨 Image colorized successfully.";
-
         await sock.sendMessage(chatId, {
             image: { url: resultUrl },
-            caption: caption
+            caption: t('colorize.success', {}, userLang)
         }, { quoted: msg });
 
         await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
@@ -189,7 +141,7 @@ ${settings.prefix}colorize <custom prompt>
     } catch (e) {
         console.error('Colorize Error:', e);
         await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-        await sock.sendMessage(chatId, { text: "❌ Failed to colorize image:\n" + e.message }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('colorize.error', {}, userLang) + `\n⚠️ ${e.message}` }, { quoted: msg });
     }
 }
 

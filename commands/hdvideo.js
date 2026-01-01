@@ -7,6 +7,8 @@ const path = require("path");
 const crypto = require("crypto");
 const axios = require("axios"); // Used to download media from the message
 const FormData = require('form-data');
+const { t } = require('../lib/language');
+const settings = require('../settings');
 
 // Get the current directory to store temporary files
 const tempDir = path.join(__dirname, '../temp');
@@ -41,7 +43,7 @@ const baseApi = "https://api.unblurimage.ai";
  * @param {import('@adiwajshing/baileys').WAMessage} msg
  * @param {string[]} args
  */
-let handler = async (sock, chatId, msg, args) => {
+let handler = async (sock, chatId, msg, args, commands, userLang) => {
     const productSerial = crypto.randomUUID().replace(/-/g, "");
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     let videoPath = null;
@@ -54,13 +56,13 @@ let handler = async (sock, chatId, msg, args) => {
         let q = msg.quoted ? msg.quoted : msg;
         let mime = (q.msg || q).mimetype || '';
         if (!/video/.test(mime)) {
-            return sock.sendMessage(chatId, { text: "Please send or reply to a video with this command." }, { quoted: msg });
+            return sock.sendMessage(chatId, { text: t('video_ai.usage', { prefix: settings.prefix }, userLang) }, { quoted: msg });
         }
 
         // Download the video and save it temporarily
         let media = await q.download?.();
         if (!media) {
-            return sock.sendMessage(chatId, { text: "Failed to download video." }, { quoted: msg });
+            return sock.sendMessage(chatId, { text: t('common.error', {}, userLang) }, { quoted: msg });
         }
 
         // Determine the temporary path
@@ -71,7 +73,7 @@ let handler = async (sock, chatId, msg, args) => {
 
         const absPath = path.resolve(videoPath);
 
-        await sock.sendMessage(chatId, { text: "✅ Video received. Starting the upscale process..." }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('video_ai.wait', {}, userLang) }, { quoted: msg });
 
         // --- 2. Video Upload (Step 1: Request Upload URL) ---
 
@@ -107,7 +109,7 @@ let handler = async (sock, chatId, msg, args) => {
             return sock.sendMessage(chatId, { text: `❌ Failed to upload file. Status: ${putRes.status}` }, { quoted: msg });
         }
 
-        await sock.sendMessage(chatId, { text: "⬆️ Video successfully uploaded. Starting conversion job..." }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('video_ai.uploading', {}, userLang) }, { quoted: msg });
 
         // --- 4. Create Enhancer Job ---
 
@@ -140,7 +142,7 @@ let handler = async (sock, chatId, msg, args) => {
             return sock.sendMessage(chatId, { text: "❌ Job ID not found." }, { quoted: msg });
         }
 
-        await sock.sendMessage(chatId, { text: `⏳ Job ID: ${job_id} created. Waiting for results... (Max 5 minutes)` }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('video_ai.job_created', { job_id }, userLang) }, { quoted: msg });
 
         // --- 5. Poll Job Status ---
 
@@ -184,13 +186,13 @@ let handler = async (sock, chatId, msg, args) => {
         const { output_url } = result;
 
         if (output_url) {
-            await sock.sendMessage(chatId, { text: "✅ Job finished. Sending the upscaled video..." }, { quoted: msg });
+            await sock.sendMessage(chatId, { text: t('video_ai.success', {}, userLang) }, { quoted: msg });
 
             const { data } = await axios.get(output_url, { responseType: 'arraybuffer' });
 
             await sock.sendMessage(chatId, {
                 video: Buffer.from(data),
-                caption: `🌟 **Video Upscale Successful!**\n\nResolution: 2K\nURL: ${output_url}`,
+                caption: t('video_ai.caption', { botName: settings.botName, url: output_url }, userLang),
                 fileName: `upscaled-${job_id}.mp4`
             }, { quoted: msg });
 
@@ -200,7 +202,7 @@ let handler = async (sock, chatId, msg, args) => {
 
     } catch (err) {
         console.error("Error running hdvideo handler:", err);
-        sock.sendMessage(chatId, { text: `❌ A runtime error occurred: ${err.message}` }, { quoted: msg });
+        sock.sendMessage(chatId, { text: t('video_ai.error', {}, userLang) + `\n⚠️ ${err.message}` }, { quoted: msg });
     } finally {
         // --- 7. Cleanup ---
         if (tempFilePath) {

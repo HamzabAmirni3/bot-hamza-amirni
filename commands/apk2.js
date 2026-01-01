@@ -12,7 +12,7 @@ const settings = require('../settings');
 const apkSessions = {};
 
 // Helper function to download with streaming (memory efficient)
-async function downloadWithProgress(url, maxSize = 100 * 1024 * 1024) {
+async function downloadWithProgress(url, maxSize = 300 * 1024 * 1024) {
     const tempDir = path.join(__dirname, '../temp');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
     const tempFilePath = path.join(tempDir, `apk_${Date.now()}.apk`);
@@ -146,8 +146,8 @@ async function apk2Command(sock, chatId, msg, args, commands, userLang) { // Ren
             // Download with progress tracking
             let tempPath;
             try {
-                // Limit 150MB
-                tempPath = await downloadWithProgress(data.link, 150 * 1024 * 1024);
+                // Limit 300MB
+                tempPath = await downloadWithProgress(data.link, 300 * 1024 * 1024);
             } catch (downloadError) {
                 if (downloadError.message.includes('File too large')) {
                     throw new Error(t('download.apk_error_large', {}, userLang));

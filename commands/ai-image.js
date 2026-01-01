@@ -1,6 +1,6 @@
 const axios = require('axios');
 const settings = require('../settings');
-const { sendWithChannelButton } = require('../lib/channelButton');
+const { t } = require('../lib/language');
 
 /**
  * AI Labs - Image Generation Logic
@@ -41,9 +41,9 @@ const aiLabs = {
         }
     },
     generateImage: async (prompt = '') => {
-        // Basic validation (Original check, will use translated prompt later)
+        // Basic validation
         if (!prompt?.trim()) {
-            return { success: false, error: 'الوصف فارغ (Empty prompt).' };
+            return { success: false, error: 'Empty prompt' };
         }
 
         await aiLabs.setup.decrypt();
@@ -53,7 +53,7 @@ const aiLabs = {
             const res = await axios.post(url, payload, { headers: aiLabs.headers });
 
             if (res.data.code !== 0 || !res.data.data) {
-                return { success: false, error: 'فشل توليد الصورة من السيرفر.' };
+                return { success: false, error: 'Server failed to generate image.' };
             }
             return { success: true, url: res.data.data };
         } catch (err) {
@@ -66,31 +66,13 @@ async function aiImageCommand(sock, chatId, msg, args, commands, userLang) {
     const text = args.join(' ').trim();
 
     if (!text) {
-        const helpMsg = `🎨 *توليد الصور بالذكاء الاصطناعي (AI Image Labs)* 🎨
-
-🔹 *الاستخدام:*
-\u200E${settings.prefix}ai-image [وصف الصورة]
-
-📝 *مثال:*
-\u200E${settings.prefix}ai-image قطة رائد فضاء في الفضاء
-
-💡 يمكنك الكتابة بالعربية أو الإنجليزية، البوت سيقوم بالترجمة التلقائية.
-
-⚔️ ${settings.botName}`;
-        return await sendWithChannelButton(sock, chatId, helpMsg, msg, {}, userLang);
+        return await sock.sendMessage(chatId, { text: t('ai_image.help', { prefix: settings.prefix, botName: settings.botName }, userLang) }, { quoted: msg });
     }
 
     try {
         await sock.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
 
-        // Send Wait Message
-        const waitMsg = userLang === 'ma'
-            ? "🎨 *كنرسم ليك فالتصويرة، بلاتي...*"
-            : userLang === 'ar'
-                ? "🎨 *جارٍ رسم الصورة، يرجى الانتظار...*"
-                : "🎨 *Generating image, please wait...*";
-
-        await sendWithChannelButton(sock, chatId, waitMsg, msg, {}, userLang);
+        await sock.sendMessage(chatId, { text: t('ai_image.wait', {}, userLang) }, { quoted: msg });
 
         // Translate to English for better API results
         let promptToUse = text;
@@ -106,15 +88,9 @@ async function aiImageCommand(sock, chatId, msg, args, commands, userLang) {
         const response = await aiLabs.generateImage(promptToUse);
 
         if (response.success) {
-            const caption = userLang === 'ma'
-                ? `✅ *ها الصورة ناضية!*\n📝 *الفكرة:* ${text}\n\n⚔️ ${settings.botName}`
-                : userLang === 'ar'
-                    ? `✅ *تم توليد الصورة بنجاح!*\n📝 *الوصف:* ${text}\n\n⚔️ ${settings.botName}`
-                    : `✅ *Image Generated Successfully!*\n📝 *Prompt:* ${text}\n\n⚔️ ${settings.botName}`;
-
             await sock.sendMessage(chatId, {
                 image: { url: response.url },
-                caption: caption
+                caption: t('ai_image.success', { text, botName: settings.botName }, userLang)
             }, { quoted: msg });
             await sock.sendMessage(chatId, { react: { text: "🎨", key: msg.key } });
         } else {
@@ -124,13 +100,7 @@ async function aiImageCommand(sock, chatId, msg, args, commands, userLang) {
     } catch (error) {
         console.error('ai-image error:', error);
         await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
-        const errText = userLang === 'ma'
-            ? `❌ *وقع مشكل ف الرسم.*\n⚠️ السبب: ${error.message}`
-            : userLang === 'ar'
-                ? `❌ فشل توليد الصورة.\n⚠️ السبب: ${error.message}`
-                : `❌ Failed to generate image.\n⚠️ Reason: ${error.message}`;
-
-        await sock.sendMessage(chatId, { text: errText }, { quoted: msg });
+        await sock.sendMessage(chatId, { text: t('ai.error', {}, userLang) + `\n⚠️ ${error.message}` }, { quoted: msg });
     }
 }
 

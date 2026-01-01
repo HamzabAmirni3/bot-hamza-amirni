@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const util = require('util');
 const execAsync = util.promisify(require('child_process').exec);
+const { t } = require('../lib/language');
 
 // Safe require for optional dependencies
 let createCanvas, Jimp;
@@ -149,11 +150,11 @@ async function makeBratVideo(text, {
   return output
 }
 
-let handler = async (sock, chatId, msg, args) => {
+let handler = async (sock, chatId, msg, args, commands, userLang) => {
   const text = args.join(" ");
-  if (!text) return sock.sendMessage(chatId, { text: '📥 أرسل النص بعد الأمر.\nمثال: .brat-vd Hamza Bot' }, { quoted: msg });
+  if (!text) return sock.sendMessage(chatId, { text: t('brat_vd.usage', {}, userLang) }, { quoted: msg });
 
-  sock.sendMessage(chatId, { text: "⏳ جاري إنشاء الفيديو... المرجو الانتظار قليلاً" }, { quoted: msg });
+  sock.sendMessage(chatId, { text: t('brat_vd.wait', {}, userLang) }, { quoted: msg });
 
   try {
     const filePath = await makeBratVideo(text, {
@@ -163,10 +164,10 @@ let handler = async (sock, chatId, msg, args) => {
       speed: "normal"
     })
 
-    await sock.sendFile(chatId, filePath, 'brat_video.mp4', '📽️ تم إنشاء الفيديو بنجاح', msg)
+    await sock.sendFile(chatId, filePath, 'brat_video.mp4', t('brat_vd.success', {}, userLang), msg)
     fs.existsSync(filePath) && fs.unlinkSync(filePath)
   } catch (e) {
-    sock.sendMessage(chatId, { text: '❌ حدث خطأ أثناء إنشاء الفيديو:\nℹ️ تأكد من تثبيت مكتبة canvas: npm install canvas\n' + e }, { quoted: msg });
+    sock.sendMessage(chatId, { text: t('brat_vd.error', {}, userLang) + `\n` + e }, { quoted: msg });
   }
 }
 handler.help = ['brat-vd']

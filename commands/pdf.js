@@ -29,28 +29,29 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
                 };
             }
 
-            const buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: console });
+            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+            const buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: undefined, reuploadRequest: sock.updateMediaMessage });
             const imageUrl = await uploadImage(buffer);
 
             // Try multiple APIs for Image to PDF
             let response;
             try {
-                // API 1: Lolhuman (if free/working) or similar generic tools
-                response = await axios.get(`https://api.caliph.biz.id/api/imagetopdf?url=${encodeURIComponent(imageUrl)}&apikey=caliphkey`, { responseType: 'arraybuffer', timeout: 30000 });
+                // API 1: Ryzendesu (Stable)
+                response = await axios.get(`https://api.ryzendesu.vip/api/tools/img2pdf?url=${encodeURIComponent(imageUrl)}`, { responseType: 'arraybuffer', timeout: 45000 });
             } catch (e1) {
                 try {
-                    // API 2: Tiklydown Tools (often has pdf) or others
-                    response = await axios.get(`https://api.tiklydown.eu.org/api/tools/img2pdf?url=${encodeURIComponent(imageUrl)}`, { responseType: 'arraybuffer', timeout: 30000 });
+                    // API 2: Caliph Fallback
+                    response = await axios.get(`https://api.caliph.biz.id/api/imagetopdf?url=${encodeURIComponent(imageUrl)}&apikey=caliphkey`, { responseType: 'arraybuffer', timeout: 30000 });
                 } catch (e2) {
-                    // API 3: Generic fallback
-                    response = await axios.get(`https://api.vreden.my.id/api/imagetopdf?url=${encodeURIComponent(imageUrl)}`, { responseType: 'arraybuffer', timeout: 30000 });
+                    // API 3: Tiklydown
+                    response = await axios.get(`https://api.tiklydown.eu.org/api/tools/img2pdf?url=${encodeURIComponent(imageUrl)}`, { responseType: 'arraybuffer', timeout: 30000 });
                 }
             }
 
             if (!response || !response.data) throw new Error("All APIs failed");
 
-            const tempDir = path.join(__dirname, '../temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+            const tempDir = path.join(process.cwd(), 'tmp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const tempFile = path.join(tempDir, `image_${Date.now()}.pdf`);
             fs.writeFileSync(tempFile, response.data);
 
@@ -58,7 +59,7 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
                 document: { url: tempFile },
                 fileName: "image_converted.pdf",
                 mimetype: "application/pdf",
-                caption: t('pdf.success_image', { botName: t('common.botName', {}, userLang) }, userLang)
+                caption: t('pdf.success_image', { botName: settings.botName }, userLang)
             }, { quoted: message });
 
             if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
@@ -83,17 +84,20 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
             // Try reliable Text to PDF APIs
             let response;
             try {
-                // API 1: PDFShift or similar if keyless, otherwise use html2pdf app
-                // Using a public endpoint that generates PDF from HTML/Text
-                const htmlContent = `<html><body><pre style="font-family: Arial; white-space: pre-wrap;">${content.replace(/</g, '&lt;')}</pre></body></html>`;
-                response = await axios.get(`https://api.html2pdf.app/v1/generate?html=${encodeURIComponent(htmlContent)}&apiKey=fb5d282d8299763784131df66270929280d9659b81b8969877717887550ca2fc`, { responseType: 'arraybuffer' });
+                // Using a more reliable way: Ryzendesu Tool for Text to PDF if exists or similar
+                // Fallback to a working public converter
+                response = await axios.get(`https://api.vreden.my.id/api/txt2pdf?text=${encodeURIComponent(content)}`, { responseType: 'arraybuffer', timeout: 30000 });
             } catch (e1) {
-                // Fallback probably not needed as this API is quite stable with free tier
-                throw new Error("Text to PDF API failed");
+                try {
+                    const htmlContent = `<html><body><pre style="font-family: Arial; white-space: pre-wrap;">${content.replace(/</g, '&lt;')}</pre></body></html>`;
+                    response = await axios.get(`https://api.html2pdf.app/v1/generate?html=${encodeURIComponent(htmlContent)}&apiKey=fb5d282d8299763784131df66270929280d9659b81b8969877717887550ca2fc`, { responseType: 'arraybuffer' });
+                } catch (e2) {
+                    throw new Error("Text to PDF failed");
+                }
             }
 
-            const tempDir = path.join(__dirname, '../temp');
-            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+            const tempDir = path.join(process.cwd(), 'tmp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
             const tempFile = path.join(tempDir, `text_${Date.now()}.pdf`);
             fs.writeFileSync(tempFile, response.data);
 
@@ -101,7 +105,7 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
                 document: { url: tempFile },
                 fileName: "text_converted.pdf",
                 mimetype: "application/pdf",
-                caption: t('pdf.success_text', { botName: t('common.botName', {}, userLang) }, userLang)
+                caption: t('pdf.success_text', { botName: settings.botName }, userLang)
             }, { quoted: message });
 
             if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);

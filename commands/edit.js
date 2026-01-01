@@ -6,31 +6,16 @@ const { translateToEn } = require('../lib/translate');
 const { t } = require('../lib/language');
 
 /**
- * AI Image Modifier (img2img)
- * Uses Ryzendesu API (more stable)
- */
-/**
- * AI Image Modifier (img2img)
- * Uses Pollinations AI (Stable & Free)
+ * AI Image Modifier (img2img / reimage)
+ * Uses Vreden or Ryzendesu API for actual editing
  */
 async function img2img(url, prompt) {
     try {
-        // Pollinations supports img2img by passing 'image' parameter
-        // Ensure prompt is URL encoded
-        const enPrompt = encodeURIComponent(prompt);
-        const imageUrl = encodeURIComponent(url);
+        // Preference for Vreden as it often respects the image structure better
+        const apiUrl = `https://api.vreden.my.id/api/reimage?url=${encodeURIComponent(url)}&prompt=${encodeURIComponent(prompt)}`;
 
-        // Using Flux model by default for good quality
-        const apiUrl = `https://image.pollinations.ai/prompt/${enPrompt}?image=${imageUrl}&width=1024&height=1024&model=flux&nologo=true`;
+        const response = await axios.get(apiUrl, { responseType: 'arraybuffer', timeout: 60000 });
 
-        console.log(`[Edit] Calling Pollinations with: ${apiUrl}`);
-
-        const response = await axios.get(apiUrl, {
-            responseType: 'arraybuffer',
-            timeout: 60000
-        });
-
-        // Verify content type
         const contentType = response.headers['content-type'];
         if (contentType && contentType.includes('application/json')) {
             const json = JSON.parse(response.data.toString());
@@ -39,8 +24,15 @@ async function img2img(url, prompt) {
 
         return response.data;
     } catch (error) {
-        console.error("Img2Img API Error:", error.message);
-        throw new Error("فشلت معالجة الصورة (Pollinations Error).");
+        console.error("Vreden Edit Error, trying Ryzendesu:", error.message);
+        try {
+            const apiUrl = `https://api.ryzendesu.vip/api/ai/img2img?url=${encodeURIComponent(url)}&prompt=${encodeURIComponent(prompt)}`;
+            const response = await axios.get(apiUrl, { responseType: 'arraybuffer', timeout: 60000 });
+            return response.data;
+        } catch (err2) {
+            console.error("All Edit APIs failed:", err2.message);
+            throw new Error("فشلت معالجة التعديل (All APIs Failed).");
+        }
     }
 }
 

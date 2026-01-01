@@ -1,7 +1,8 @@
-// Instagram: noureddine_ouafy
-// scrape by malik
-const axios = require("axios")
-const FormData = require("form-data")
+const axios = require("axios");
+const FormData = require("form-data");
+const { t } = require('../lib/language');
+const settings = require('../settings');
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 
 class RemoveBg {
   constructor() {
@@ -22,7 +23,7 @@ class RemoveBg {
   async run({ buffer, contentType }) {
     try {
       const fileSizeMB = buffer.length / (1024 * 1024)
-      if (fileSizeMB > 5) throw new Error(`❌ File size ${fileSizeMB.toFixed(2)}MB exceeds 5MB limit.`)
+      if (fileSizeMB > 5) throw new Error(`File size ${fileSizeMB.toFixed(2)}MB exceeds 5MB limit.`)
 
       const extension = contentType.split("/")[1] || "jpg"
       const form = new FormData()
@@ -45,7 +46,7 @@ class RemoveBg {
       if (result.data?.images?.length > 0) {
         return `https://backrem.pi7.org/${result.data.images[0].filename}`
       } else {
-        throw new Error("❌ Failed to process image, invalid API response.")
+        throw new Error("Invalid API response.")
       }
     } catch (error) {
       throw error
@@ -53,27 +54,46 @@ class RemoveBg {
   }
 }
 
-let handler = async (m, { conn }) => {
-  let q = m.quoted ? m.quoted : m
-  let mime = (q.msg || q).mimetype || ""
-  if (!/image\/(jpe?g|png)/.test(mime)) {
-    return conn.sendMessage(m.chat, { text: "📷 Please reply with an image and use *.removebg*" }, { quoted: m });
+async function removebgCommand(sock, chatId, msg, args, commands, userLang) {
+  let quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage ? {
+    message: msg.message.extendedTextMessage.contextInfo.quotedMessage,
+    key: {
+      remoteJid: chatId,
+      id: msg.message.extendedTextMessage.contextInfo.stanzaId,
+      participant: msg.message.extendedTextMessage.contextInfo.participant
+    }
+  } : msg;
+
+  const isImage = !!(quoted.message?.imageMessage || (quoted.message?.documentMessage && quoted.message.documentMessage.mimetype?.includes('image')));
+
+  if (!isImage) {
+    return await sock.sendMessage(chatId, { text: t('removebg.help', { prefix: settings.prefix }, userLang) }, { quoted: msg });
   }
 
   try {
-    let img = await q.download() // download image buffer
-    const remover = new RemoveBg()
-    let result = await remover.run({ buffer: img, contentType: mime })
+    await sock.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
 
-    await conn.sendFile(m.chat, result, "removed.png", "✅ Background removed successfully!", m)
+    let buffer = await downloadMediaMessage(quoted, 'buffer', {}, {
+      logger: undefined,
+      reuploadRequest: sock.updateMediaMessage
+    });
+
+    const mime = (quoted.message?.imageMessage || quoted.message?.documentMessage)?.mimetype || "image/jpeg";
+
+    const remover = new RemoveBg()
+    let result = await remover.run({ buffer, contentType: mime })
+
+    await sock.sendMessage(chatId, {
+      image: { url: result },
+      caption: t('removebg.success', {}, userLang)
+    }, { quoted: msg });
+
+    await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
+
   } catch (e) {
-    conn.sendMessage(m.chat, { text: "❌ Error removing background, please try again." }, { quoted: m });
+    console.error('RemoveBG Error:', e);
+    await sock.sendMessage(chatId, { text: t('removebg.error', {}, userLang) + `\n⚠️ ${e.message}` }, { quoted: msg });
   }
 }
 
-handler.help = ["removebg"]
-handler.command = ["removebg"]
-handler.tags = ["tools"]
-handler.limit = true
-
-module.exports = handler;
+module.exports = removebgCommand;
