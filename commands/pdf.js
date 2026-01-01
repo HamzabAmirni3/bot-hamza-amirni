@@ -36,8 +36,8 @@ async function pdfCommand(sock, chatId, message, args, commands, userLang) {
                 if (isQuotedDoc) {
                     targetMsg.key = {
                         remoteJid: chatId,
-                        id: message.message.extendedTextMessage.contextInfo.stanzaId,
-                        participant: message.message.extendedTextMessage.contextInfo.participant
+                        id: message.message?.extendedTextMessage?.contextInfo?.stanzaId,
+                        participant: message.message?.extendedTextMessage?.contextInfo?.participant
                     };
                 }
 
