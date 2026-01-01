@@ -467,8 +467,11 @@ async function startBot() {
             if (statusCode === 401) {
                 if (fs.existsSync(sessionDir)) fs.rmSync(sessionDir, { recursive: true, force: true });
                 setTimeout(() => startBot(), 5000);
-            } else if (shouldReconnect || statusCode === 515) {
-                setTimeout(() => startBot(), 10000);
+            } else if (shouldReconnect || statusCode === 515 || statusCode === 428 || statusCode === 408) {
+                // 428: Precondition Required (often sync issues), 408: Timeout, 515: Stream restart
+                const delay = statusCode === 428 ? 2000 : 10000;
+                console.log(chalk.yellow(`⚠️ Reconnecting automatically in ${delay}ms...`));
+                setTimeout(() => startBot(), delay);
             } else {
                 process.exit(1);
             }
@@ -709,6 +712,7 @@ ${settings.portfolio}
     if (process.listeners('uncaughtException').length < 1) {
         process.on('uncaughtException', (err) => {
             if (err.message?.includes('Connection Closed')) return;
+            if (err.message?.includes('Timed Out')) return;
             console.error('Critical Uncaught Exception:', err);
         });
     }
@@ -716,6 +720,7 @@ ${settings.portfolio}
     if (process.listeners('unhandledRejection').length < 1) {
         process.on('unhandledRejection', (reason, promise) => {
             if (reason?.message?.includes('Connection Closed')) return;
+            if (reason?.message?.includes('Timed Out')) return;
             console.error('Unhandled Rejection at:', promise, 'reason:', reason);
         });
     }
