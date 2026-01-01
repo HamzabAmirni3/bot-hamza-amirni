@@ -390,26 +390,30 @@ async function startBot() {
                         });
                     }
 
-                    // --- SEND SESSION ID TO OWNER ---
-                    setTimeout(async () => {
-                        try {
-                            const credsPath = path.join(sessionDir, 'creds.json');
-                            if (fs.existsSync(credsPath)) {
-                                const creds = fs.readFileSync(credsPath, 'utf-8');
-                                const sessionID = 'Session~' + Buffer.from(creds).toString('base64');
+                    // --- SEND SESSION ID TO OWNER (Only if not already set in ENV) ---
+                    if (!process.env.SESSION_ID) {
+                        setTimeout(async () => {
+                            try {
+                                const credsPath = path.join(sessionDir, 'creds.json');
+                                if (fs.existsSync(credsPath)) {
+                                    const creds = fs.readFileSync(credsPath, 'utf-8');
+                                    const sessionID = 'Session~' + Buffer.from(creds).toString('base64');
 
-                                const sessionMsg = `🔐 *YOUR SESSION ID* 🔐\n\n` +
-                                    `Keep this safe! This ID allows you to reconnect without a Pairing Code.\n\n` +
-                                    `\`${sessionID}\`\n\n` +
-                                    `Add this to your *SESSION_ID* environment variable on Koyeb to keep the bot alive forever! 🚀`;
+                                    const sessionMsg = `🔐 *YOUR SESSION ID* 🔐\n\n` +
+                                        `Keep this safe! This ID allows you to reconnect without a Pairing Code.\n\n` +
+                                        `\`${sessionID}\`\n\n` +
+                                        `Add this to your *SESSION_ID* environment variable on Koyeb to keep the bot alive forever! 🚀`;
 
-                                await sock.sendMessage(botJid, { text: sessionMsg });
-                                console.log(chalk.green('✅ Session ID sent to bot number.'));
-                            }
-                        } catch (e) {
-                            console.error('Failed to send Session ID:', e);
-                        }
-                    }, 5000);
+                                    if (sock.user && !sock.isClosed) {
+                                        await sock.sendMessage(botJid, { text: sessionMsg });
+                                        console.log(chalk.green('✅ Session ID sent to bot number.'));
+                                    }
+                                }
+                            } catch (e) { }
+                        }, 15000);
+                    } else {
+                        console.log(chalk.cyan('ℹ️ SESSION_ID is already configured. Skipping auto-send to prevent loop.'));
+                    }
                 } catch (err) {
                     console.error('Failed to send self-connected message:', err);
                 }
