@@ -1,7 +1,6 @@
 /*
 📄 تحويل ملف PDF إلى صور
 By: حمزة اعمرني (Hamza Amirni)
-channel: https://whatsapp.com/channel/0029ValXRoHCnA7yKopcrn1p
 */
 
 const { downloadMediaMessage } = require("@whiskeysockets/baileys");
@@ -65,31 +64,50 @@ async function handler(sock, chatId, msg, args) {
 
         const pdfUrl = await uploadToCatbox(buffer, fileName);
 
-        // استخدام API لتحويل PDF لصور
-        // سنستخدم API من vreden.web.id أو ما شابه
-        const apiUrl = `https://api.vreden.web.id/api/pdftoimg?url=${encodeURIComponent(pdfUrl)}`;
+        // قائمة بـ APIs محتملة للتحويل (Fallbacks)
+        const apis = [
+            `https://api.vreden.my.id/api/pdftoimg?url=${encodeURIComponent(pdfUrl)}`,
+            `https://api.shizuhub.me/tools/pdftoimg?url=${encodeURIComponent(pdfUrl)}`,
+            `https://obito-mr-apis.vercel.app/api/tools/pdf-to-img?url=${encodeURIComponent(pdfUrl)}` // فرضية
+        ];
 
-        console.log('PDF to Img API:', apiUrl);
-        const res = await axios.get(apiUrl, { timeout: 60000 });
-        const data = res.data;
+        let images = [];
+        let success = false;
+
+        for (let apiUrl of apis) {
+            try {
+                console.log('Trying PDF to Img API:', apiUrl);
+                const res = await axios.get(apiUrl, { timeout: 60000 });
+                const data = res.data;
+
+                if (data.status === true || data.result || Array.isArray(data)) {
+                    if (Array.isArray(data.result)) {
+                        images = data.result;
+                    } else if (data.result && Array.isArray(data.result.images)) {
+                        images = data.result.images;
+                    } else if (Array.isArray(data)) {
+                        images = data;
+                    } else if (data.data && Array.isArray(data.data)) {
+                        images = data.data;
+                    }
+
+                    if (images.length > 0) {
+                        success = true;
+                        break;
+                    }
+                }
+            } catch (e) {
+                console.error(`API ${apiUrl} failed:`, e.message);
+            }
+        }
 
         await sock.sendMessage(chatId, { delete: waitMsg.key });
 
-        // التحقق من النتيجة (تختلف حسب الـ API)
-        let images = [];
-        if (Array.isArray(data.result)) {
-            images = data.result;
-        } else if (data.result && Array.isArray(data.result.images)) {
-            images = data.result.images;
-        } else if (typeof data === 'object' && Array.isArray(data)) {
-            images = data;
+        if (!success || images.length === 0) {
+            throw new Error("لم نتمكن من تحويل الملف حالياً. جرب لاحقاً أو استعمل ملفاً أصغر.");
         }
 
-        if (images.length === 0) {
-            throw new Error("لم يتم العثور على صور في هذا الملف أو فشل التحويل.");
-        }
-
-        // إرسال أول 10 صفحات لتجنب السبام (أو حسب رغبة المستخدم)
+        // إرسال أول 10 صفحات لتجنب السبام
         const limit = Math.min(images.length, 10);
 
         for (let i = 0; i < limit; i++) {

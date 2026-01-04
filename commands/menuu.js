@@ -88,7 +88,7 @@ module.exports = async (sock, chatId, msg, args, commands, userLang) => {
         menuText += `┃ 🖼️ .ملصق (sticker)\n`;
         menuText += `┃ 🗣️ .ترجمة (translate)\n`;
         menuText += `┃ 🔍 .استخراج (ocr)\n`;
-        menuText += `┃ 📄 .صور-pdf (pdf2img)\n`;
+        menuText += `┃ 📄 .pdf-صور (pdf2img)\n`;
         menuText += `┃ 🎵 .صوت (tomp3)\n`;
         menuText += `┃ 🏁 .باركود (qrcode)\n`;
         menuText += `┃ 🌦️ .طقس (weather)\n`;
