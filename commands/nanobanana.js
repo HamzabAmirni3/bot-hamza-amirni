@@ -127,6 +127,8 @@ async function handler(sock, chatId, msg, args) {
         react: { text: "🕒", key: msg.key }
     });
 
+    const waitMsg = await sock.sendMessage(chatId, { text: "🔄 جاري معالجة طلبك وتعديل الصورة بذكاء نانو... قد يستغرق الأمر بضع ثوانٍ." }, { quoted: msg });
+
     try {
         const buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, {
             logger: undefined,
@@ -142,6 +144,8 @@ async function handler(sock, chatId, msg, args) {
         fs.writeFileSync(filePath, buffer);
 
         const result = await processImageAI(filePath, text);
+
+        await sock.sendMessage(chatId, { delete: waitMsg.key });
 
         const caption = `
 *✨ ───❪ HAMZA AMIRNI ❫─── ✨*
@@ -180,6 +184,7 @@ async function handler(sock, chatId, msg, args) {
 
     } catch (e) {
         console.error(e);
+        if (waitMsg) await sock.sendMessage(chatId, { delete: waitMsg.key });
         await sock.sendMessage(chatId, {
             text: `*✨ ──────────────── ✨*\n*❌ فشل التعديل*\n\n📌 تأكد من أن الصورة واضحة والوصف مفهوم\n*✨ ──────────────── ✨*`
         }, { quoted: msg });
