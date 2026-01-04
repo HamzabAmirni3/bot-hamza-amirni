@@ -1,12 +1,30 @@
 /*
-📄 تحويل ملف PDF إلى صور (محلي)
+📄 تحويل ملف PDF إلى صور (الكل)
 By: حمزة اعمرني (Hamza Amirni)
 */
 
 const { downloadMediaMessage } = require("@whiskeysockets/baileys");
+const axios = require('axios');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
 const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// رفع الملف إلى Catbox للحصول على رابط
+const uploadToCatbox = async (buffer, filename) => {
+    const form = new FormData();
+    form.append('fileToUpload', buffer, filename);
+    form.append('reqtype', 'fileupload');
+    try {
+        const response = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: form });
+        const text = await response.text();
+        if (text.startsWith('https://')) return text;
+        throw new Error('Catbox Upload Failed: ' + text);
+    } catch (error) {
+        throw new Error(`Upload Error: ${error.message}`);
+    }
+};
 
 async function handler(sock, chatId, msg, args) {
     const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
@@ -15,7 +33,7 @@ async function handler(sock, chatId, msg, args) {
 
     if (!isQuotedDoc && !isDirectDoc) {
         return await sock.sendMessage(chatId, {
-            text: '*✨ ──────────────── ✨*\n📄 *تحويل PDF إلى صور* 📄\n\n📌 *يرجى الرد على ملف PDF بـ:*\n.pdf2img\n*✨ ──────────────── ✨*'
+            text: '*✨ ──────────────── ✨*\n📄 *تحويل PDF إلى صور (جميع الصفحات)* 📄\n\n📌 *يرجى الرد على ملف PDF بـ:*\n.pdf-صور\n*✨ ──────────────── ✨*'
         }, { quoted: msg });
     }
 
@@ -39,77 +57,85 @@ async function handler(sock, chatId, msg, args) {
         const buffer = await downloadMediaMessage(targetMsg, 'buffer', {}, { logger: undefined, reuploadRequest: sock.updateMediaMessage });
         if (!buffer) throw new Error("فشل تحميل الملف.");
 
-        const tempDir = path.join(process.cwd(), 'tmp');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const fileName = docMsg.fileName || `file_${Date.now()}.pdf`;
 
-        const inputName = `pdf_${Date.now()}.pdf`;
-        const inputFile = path.join(tempDir, inputName);
-        fs.writeFileSync(inputFile, buffer);
+        const waitMsg = await sock.sendMessage(chatId, { text: "🔄 جاري تحويل جميع صفحات الملف إلى صور... يرجى الانتظار." }, { quoted: msg });
 
-        const waitMsg = await sock.sendMessage(chatId, { text: "🔄 جاري تحويل الملف إلى صور محلياً... (قد يستغرق وقتاً)" }, { quoted: msg });
+        const pdfUrl = await uploadToCatbox(buffer, fileName);
 
-        // محاولة التحويل باستخدام LibreOffice (كما في الوورد)
-        // ملاحظة: LibreOffice يحول الصفحة الأولى فقط في العادة بصيغة PNG
-        const cmd = `libreoffice --headless --convert-to png --outdir "${tempDir}" "${inputFile}"`;
+        // محاولة التحويل عبر الـ APIs أولاً لجلب كل الصفحات
+        const apis = [
+            `https://api.vreden.my.id/api/pdftoimg?url=${encodeURIComponent(pdfUrl)}`,
+            `https://api.shizuhub.me/tools/pdftoimg?url=${encodeURIComponent(pdfUrl)}`
+        ];
 
-        await new Promise((resolve, reject) => {
-            exec(cmd, (error, stdout, stderr) => {
-                if (error) {
-                    console.error('LibreOffice PDF to Img Error:', stderr);
-                    reject(error);
-                } else {
-                    resolve();
+        let images = [];
+        let success = false;
+
+        for (let apiUrl of apis) {
+            try {
+                console.log('Trying API for all pages:', apiUrl);
+                const res = await axios.get(apiUrl, { timeout: 60000 });
+                const data = res.data;
+
+                images = data.result || data.data || (Array.isArray(data) ? data : []);
+                if (images.length > 0) {
+                    success = true;
+                    break;
                 }
-            });
-        });
-
-        const outputName = inputName.replace('.pdf', '.png');
-        const outputFile = path.join(tempDir, outputName);
-
-        if (fs.existsSync(outputFile)) {
-            await sock.sendMessage(chatId, {
-                image: { url: outputFile },
-                caption: `📄 *تحويل الصفحة الأولى بنجاح* ✨\n\n*HAMZA AMIRNI*`
-            }, { quoted: msg });
-
-            // تنظيف الملفات
-            fs.unlinkSync(inputFile);
-            fs.unlinkSync(outputFile);
-        } else {
-            // إذا فشل LibreOffice، جربنا API بديل (vreden.my.id)
-            console.log('LibreOffice output not found, falling back to API...');
-            const axios = require('axios');
-            const fetch = require('node-fetch');
-            const FormData = require('form-data');
-
-            const uploadToCatbox = async (buf, name) => {
-                const form = new FormData();
-                form.append('fileToUpload', buf, name);
-                form.append('reqtype', 'fileupload');
-                const res = await fetch('https://catbox.moe/user/api.php', { method: 'POST', body: form });
-                return await res.text();
-            };
-
-            const pdfUrl = await uploadToCatbox(buffer, inputName);
-            const apiUrl = `https://api.vreden.my.id/api/pdftoimg?url=${encodeURIComponent(pdfUrl)}`;
-            const res = await axios.get(apiUrl);
-
-            let images = res.data.result || res.data.data || [];
-            if (Array.isArray(images) && images.length > 0) {
-                for (let i = 0; i < Math.min(images.length, 5); i++) {
-                    await sock.sendMessage(chatId, { image: { url: images[i] }, caption: `📄 الصفحة ${i + 1}` });
-                }
-            } else {
-                throw new Error("لم يتم العثور على صور في الملف.");
+            } catch (e) {
+                console.error(`API ${apiUrl} failed, trying next...`);
             }
         }
 
         await sock.sendMessage(chatId, { delete: waitMsg.key });
+
+        if (success && images.length > 0) {
+            // إرسال جميع الصفحات (بحد أقصى 20 لتجنب الحظر)
+            const limit = Math.min(images.length, 20);
+            for (let i = 0; i < limit; i++) {
+                const imgUrl = typeof images[i] === 'string' ? images[i] : images[i].url;
+                await sock.sendMessage(chatId, {
+                    image: { url: imgUrl },
+                    caption: `📄 *الصفحة ${i + 1} من أصل ${images.length}*\n\n*HAMZA AMIRNI*`
+                });
+            }
+            if (images.length > 20) {
+                await sock.sendMessage(chatId, { text: "⚠️ تم إرسال أول 20 صفحة فقط للحفاظ على استقرار الشات." });
+            }
+        } else {
+            // Fallback: Local conversion for at least the first page if APIs fail
+            console.log('API failed, falling back to local conversion for page 1...');
+            const tempDir = path.join(process.cwd(), 'tmp');
+            if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+            const inputFile = path.join(tempDir, fileName);
+            fs.writeFileSync(inputFile, buffer);
+
+            const cmd = `libreoffice --headless --convert-to png --outdir "${tempDir}" "${inputFile}"`;
+            await new Promise((resolve) => {
+                exec(cmd, () => resolve());
+            });
+
+            const outputName = fileName.replace('.pdf', '.png');
+            const outputFile = path.join(tempDir, outputName);
+
+            if (fs.existsSync(outputFile)) {
+                await sock.sendMessage(chatId, {
+                    image: { url: outputFile },
+                    caption: `📄 *تم تحويل الصفحة الأولى محلياً (فشل التحويل الكامل)*\n\n*HAMZA AMIRNI*`
+                }, { quoted: msg });
+                fs.unlinkSync(inputFile);
+                fs.unlinkSync(outputFile);
+            } else {
+                throw new Error("فشل تحويل الملف بالكامل.");
+            }
+        }
+
         await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
 
     } catch (err) {
-        console.error('PDF to Img Error:', err);
-        await sock.sendMessage(chatId, { text: `❌ *فشل التحويل:* ${err.message}` }, { quoted: msg });
+        console.error('PDF to Img Full Error:', err);
+        await sock.sendMessage(chatId, { text: `❌ *خطأ:* ${err.message}` }, { quoted: msg });
         await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
     }
 }

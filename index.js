@@ -411,7 +411,28 @@ async function startBot() {
                         ` *Ready to serve!*`;
 
                     if (sock.user && !sock.isClosed) {
-                        await sock.sendMessage(botJid, { text: msgText });
+                        try {
+                            const botJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
+                            const thumbBuffer = fs.readFileSync(path.resolve(__dirname, './media/hamza.jpg'));
+
+                            await sock.sendMessage(botJid, {
+                                image: thumbBuffer,
+                                caption: msgText,
+                                contextInfo: {
+                                    externalAdReply: {
+                                        title: "BOT CONNECTED",
+                                        body: "𝐇𝐀𝐌𝐙𝐀 𝐀𝐌𝐈𝐑𝐍𝐈",
+                                        thumbnail: thumbBuffer,
+                                        sourceUrl: settings.officialChannel,
+                                        mediaType: 1,
+                                        renderLargerThumbnail: true
+                                    }
+                                }
+                            });
+                        } catch (e) {
+                            // Fallback to text if image fails
+                            await sock.sendMessage(botJid, { text: msgText });
+                        }
                     }
 
                     // --- SEND SESSION ID TO OWNER (Only if not already set in ENV) ---
