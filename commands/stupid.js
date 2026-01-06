@@ -1,4 +1,4 @@
-const Jimp = require('jimp');
+const { Jimp } = require('jimp');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
@@ -25,22 +25,30 @@ async function stupidCommand(sock, chatId, msg, args) {
         const templatePath = path.resolve(__dirname, '../assets/stupid_ma.png');
 
         if (!fs.existsSync(templatePath)) {
-            return await sock.sendMessage(chatId, { text: '❌ القالب غير موجود!' }, { quoted: msg });
+            return await sock.sendMessage(chatId, { text: '❌ القالب (stupid_ma.png) غير موجود في مجلد assets!' }, { quoted: msg });
         }
 
         const waitMsg = await sock.sendMessage(chatId, { text: '🔄 جاري تصنيع الميم... يرجى الانتظار.' }, { quoted: msg });
         await sock.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
 
-        // Load images using Axios for robustness
-        const [template, avatar] = await Promise.all([
-            Jimp.read(templatePath),
-            axios.get(avatarUrl, { responseType: 'arraybuffer' })
-                .then(res => Jimp.read(Buffer.from(res.data)))
-                .catch(() => Jimp.read('https://telegra.ph/file/24fa902ead26340f3df2c.png'))
-        ]);
+        // Load images
+        let template, avatar;
+        try {
+            template = await Jimp.read(templatePath);
 
-        template.resize(1024, 1024);
-        avatar.resize(230, 230);
+            const avatarRes = await axios.get(avatarUrl, { responseType: 'arraybuffer' }).catch(() => null);
+            if (avatarRes) {
+                avatar = await Jimp.read(Buffer.from(avatarRes.data));
+            } else {
+                avatar = await Jimp.read('https://telegra.ph/file/24fa902ead26340f3df2c.png');
+            }
+        } catch (e) {
+            console.error('Jimp Read Error:', e);
+            throw new Error('Failed to read images: ' + e.message);
+        }
+
+        template.resize({ width: 1024, height: 1024 });
+        avatar.resize({ width: 230, height: 230 });
 
         // Circular mask logic
         const radius = 115;
@@ -52,12 +60,14 @@ async function stupidCommand(sock, chatId, msg, args) {
         });
 
         // Place on dog head (Top-Right Panel)
-        // Values adjusted for stupid_ma.png
         template.composite(avatar, 665, 225);
 
-        const imageBuffer = await template.getBufferAsync(Jimp.MIME_PNG);
+        // Get buffer - Jimp v1 uses getBuffer(mime) returning a promise
+        const imageBuffer = await template.getBuffer('image/png');
 
-        await sock.sendMessage(chatId, { delete: waitMsg.key });
+        try {
+            await sock.sendMessage(chatId, { delete: waitMsg.key });
+        } catch (e) { }
 
         await sock.sendMessage(chatId, {
             image: imageBuffer,
@@ -80,7 +90,7 @@ async function stupidCommand(sock, chatId, msg, args) {
     } catch (error) {
         console.error('Error in stupid command:', error);
         await sock.sendMessage(chatId, {
-            text: '❌ وقع شي غلط فالتصويرة. عاود جرب من بعد.'
+            text: `❌ وقع خطأ: ${error.message}`
         }, { quoted: msg });
     }
 }

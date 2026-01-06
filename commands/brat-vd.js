@@ -17,7 +17,8 @@ const { t } = require('../lib/language');
 let createCanvas, Jimp;
 try {
   createCanvas = require('canvas').createCanvas;
-  Jimp = require('jimp');
+  const jimpPkg = require('jimp');
+  Jimp = jimpPkg.Jimp || jimpPkg;
 } catch (e) {
   console.log('⚠️ Canvas or Jimp not installed. Brat-vd command will not work.');
 }
@@ -101,7 +102,7 @@ async function renderTextToBuffer(text, options = {}) {
   if (options.blur) {
     const img = await Jimp.read(buffer)
     img.blur(options.blur)
-    return await img.getBufferAsync(Jimp.MIME_PNG)
+    return await img.getBuffer('image/png')
   }
   return buffer
 }
