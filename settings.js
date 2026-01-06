@@ -38,6 +38,7 @@ const settings = {
   commandMode: "public",
   description: "This is a bot for managing group commands and automating tasks.",
   version: "2026.1.1",
+  hfToken: '', // HuggingFace Token for Qwen AI
 };
 
 module.exports = settings;

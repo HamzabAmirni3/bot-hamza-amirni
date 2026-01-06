@@ -21,6 +21,7 @@
         "ai": "Ask AI assistant (GPT-5)",
         "ai-image": "Generate image from text",
         "ai-img-edit": "Modify image using AI",
+        "qwen": "Generate professional AI images with Qwen 2.5 🦄",
         "carbon": "Code to professional image",
         "carbonguide": "How to use Carbon feature",
         "quran": "Read Quran (Surah/Ayah)",
