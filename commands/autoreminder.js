@@ -81,7 +81,7 @@ function loadReminderConfig() {
         }
         // Default settings - enabled by default
         return {
-            enabled: false,
+            enabled: true,
             sendAtTime: '10:00',
             message: DEFAULT_MESSAGE,
             lastSent: null,
@@ -90,7 +90,7 @@ function loadReminderConfig() {
     } catch (error) {
         console.error('Error loading reminder config:', error);
         return {
-            enabled: false,
+            enabled: true,
             sendAtTime: '10:00',
             message: DEFAULT_MESSAGE,
             lastSent: null,
