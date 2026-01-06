@@ -124,11 +124,14 @@ async function salatCommand(sock, chatId, message, args) {
     }
 }
 
+// Tracking to avoid duplicate messages on restart/reconnect
+global.prayersLastSent = global.prayersLastSent || {};
+
 function startPrayerScheduler(sock) {
     if (global.prayerCron) global.prayerCron.stop();
     global.prayerCron = cron.schedule('* * * * *', async () => {
         const currentSock = global.sock || sock;
-        if (!currentSock) return;
+        if (!currentSock || !currentSock.user) return;
 
         const prayerSettings = loadSettings();
         const now = moment().tz('Africa/Casablanca');
@@ -161,6 +164,16 @@ function startPrayerScheduler(sock) {
 
             for (const [name, time] of Object.entries(prayers)) {
                 if (time === currentTime) {
+                    const runKey = `${chatId}_${name}_${now.format('YYYY-MM-DD')}`;
+                    if (global.prayersLastSent[runKey]) continue;
+                    global.prayersLastSent[runKey] = true;
+
+                    // Clean up old keys (keep only current date)
+                    const todayDate = now.format('YYYY-MM-DD');
+                    Object.keys(global.prayersLastSent).forEach(key => {
+                        if (!key.endsWith(todayDate)) delete global.prayersLastSent[key];
+                    });
+
                     const tips = [
                         "💡 الصلاة نور، فلا تطفئ نورك.",
                         "💡 أرحنا بها يا بلال.",

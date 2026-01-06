@@ -137,18 +137,38 @@ async function ad3iyaCommand(sock, chatId, msg, argsInput, commands, userLang) {
     await sendWithChannelButton(sock, chatId, response, msg);
 }
 
+// Tracking to avoid duplicate messages on restart/reconnect
+global.duasLastSent = global.duasLastSent || {};
+
 function startScheduler(sock) {
     if (global.duasInterval) clearInterval(global.duasInterval);
     global.duasInterval = setInterval(async () => {
         const currentSock = global.sock || sock;
-        if (!currentSock) return;
+        if (!currentSock || !currentSock.user) return;
+
         const data = loadData();
         if (!data.enabled || data.subscribers.length === 0) return;
+
         const now = moment().tz('Africa/Casablanca');
-        const hours = [7, 9, 11, 12, 17, 19, 22];
+        const currentHour = now.hours();
+        const currentMinute = now.minutes();
+        const currentDate = now.format('YYYY-MM-DD');
         const isFriday = now.day() === 5;
 
-        if (now.minutes() === 0 && hours.includes(now.hours())) {
+        const hours = [7, 9, 11, 12, 17, 19, 22];
+
+        // Only run at minute 0 (the start of the hour)
+        if (currentMinute === 0 && hours.includes(currentHour)) {
+            const runKey = `${currentDate}_${currentHour}`;
+
+            // Avoid duplicate execution within the same hour
+            if (global.duasLastSent[runKey]) return;
+            global.duasLastSent[runKey] = true;
+
+            // Clean up old keys (keep only current date)
+            Object.keys(global.duasLastSent).forEach(key => {
+                if (!key.startsWith(currentDate)) delete global.duasLastSent[key];
+            });
             // Special: Friday Morning Surah Al-Kahf
             if (isFriday && now.hours() === 9) {
                 const kahfMessage = `╭━━━〘 📖 *نور الجمعة* 📖 〙━━━╮\n` +
