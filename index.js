@@ -556,6 +556,12 @@ async function startBot() {
             // Autowelcome Logic
             if (msg.key.remoteJid && !msg.key.remoteJid.endsWith('@g.us') && !msg.key.fromMe) {
                 const isUserOwner = isOwner(msg);
+
+                // 🚀 MODE CHECK: Don't welcome in Private if in Group-Only or Self mode
+                const { getBotMode } = require('./commands/mode');
+                const currentMode = getBotMode();
+                if ((currentMode === 'groups' || currentMode === 'self') && !isUserOwner) return;
+
                 const { readState: readPmState } = require('./commands/pmblocker');
                 const pmState = readPmState();
 
