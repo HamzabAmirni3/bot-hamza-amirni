@@ -105,7 +105,8 @@
         "alive": "Bot Status",
         "mode": "Bot Mode",
         "backup": "Backup Files",
-        "ghosttag": "Silent Tag"
+        "ghosttag": "Silent Tag",
+        "pdf2img": "Convert PDF to Images (All Pages) 📄"
     },
     "quran": {
         "enter_number": "❌ Please enter a Surah number or name.\n\n📝 Example:\n.quran 1  (Surah Al-Fatiha)\n.quran 36 (Surah Yasin)\nOr by name:\n.quran Al-Fatiha\n.quran alfatihah",
