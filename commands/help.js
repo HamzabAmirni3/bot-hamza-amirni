@@ -25,7 +25,7 @@ module.exports = async (sock, chatId, msg, args, commands, userLang) => {
             'new': ['qwen', 'edit', 'genai', 'banana-ai', 'ghibli', 'tomp3', 'resetlink', 'apk', 'apk2', 'apk3', 'hidetag', 'imdb', 'simp'],
             'religion': ['quran', 'salat', 'prayertimes', 'adhan', 'hadith', 'asmaa', 'azkar', 'qibla', 'ad3iya', 'dua', 'athan', 'tafsir', 'surah', 'ayah', 'fadlsalat', 'hukm', 'qiyam', 'danb', 'nasiha', 'tadabbur', 'sahaba', 'faida', 'hasanat', 'jumaa', 'hajj', 'sira', 'mawt', 'shirk', 'hub', 'deen'],
             'download': ['facebook', 'instagram', 'tiktok', 'youtube', 'mediafire', 'github', 'play', 'song', 'video', 'ytplay', 'yts'],
-            'ai': ['gemini-analyze', 'qwen', 'gpt', 'gemini', 'deepseek', 'imagine', 'aiart', 'miramuse', 'ghibli-art', 'faceswap', 'ai-enhance', 'colorize', 'remini', 'vocalremover', 'musicgen', 'hdvideo', 'winkvideo', 'unblur', 'removebg', 'brat-vd'],
+            'ai': ['gpt4o', 'gpt4om', 'gpt4', 'gpt3', 'o1', 'gemini-analyze', 'qwen', 'gpt', 'gemini', 'deepseek', 'imagine', 'aiart', 'miramuse', 'ghibli-art', 'faceswap', 'ai-enhance', 'colorize', 'remini', 'vocalremover', 'musicgen', 'hdvideo', 'winkvideo', 'unblur', 'removebg', 'brat-vd'],
             'group': ['kick', 'promote', 'demote', 'tagall', 'hidetag', 'mute', 'unmute', 'close', 'open', 'delete', 'staff', 'groupinfo', 'welcome', 'goodbye', 'warn', 'warnings', 'antibadword', 'antilink'],
             'tools': ['sticker', 'sticker-alt', 'attp', 'ttp', 'ocr', 'tts', 'say', 'toimage', 'tovideo', 'togif', 'qrcode', 'ss', 'lyrics', 'calc', 'img-blur', 'translate', 'readviewonce', 'upload'],
             'news': ['news', 'akhbar', 'football', 'kora', 'weather', 'taqes'],
@@ -172,22 +172,25 @@ module.exports = async (sock, chatId, msg, args, commands, userLang) => {
             // AI Sub-Menu
             if (aiAliases.includes(requested)) {
                 let aiMenu = header + `┌─── ❰ *مركز الذكاء الاصطناعي* ❱ ───┐\n\n` +
-                    `🎵 .musicgen : صايب موسيقى من والو\n` +
-                    `🤖 .gpt : سول GPT\n` +
+                    `🤖 *ChatGPT (GPT-Bot):*\n` +
+                    `▫️ .gpt4o : أقوى موديل (GPT-4o)\n` +
+                    `▫️ .gpt4om : النسخة السريعة (4o-mini)\n` +
+                    `▫️ .gpt4 : موديل الدقة (GPT-4)\n` +
+                    `▫️ .gpt3 : موديل (GPT-3.5)\n` +
+                    `▫️ .o1 : الموديل المفكر (O1)\n\n` +
+                    `✨ *موديلات أخرى:*\n` +
                     `♊ .gemini : سول Gemini\n` +
+                    `🔍 .gemini-analyze : حلل الصور\n` +
+                    `🧠 .deepseek : أحدث موديل صيني\n` +
+                    `🦄 .qwen : موديل علي بابا\n\n` +
+                    `🎨 *عالم الإبداع والتوليد:*\n` +
                     `🖼️ .imagine : تخيل معايا (رسم)\n` +
                     `🌟 .aiart : فن واعر بالذكاء\n` +
+                    `🎭 .ghibli-art : ستايل جيبلي\n` +
                     `📀 .hdvideo : وضح الفيديو 2K\n` +
-                    `📹 .winkvideo : زيد ف الجودة د الفيديو\n` +
                     `🖼️ .removebg : حيد الخلفية\n` +
                     `✨ .unblur : صفّي التصويرة\n` +
-                    `🎞️ .brat-vd : نص إلى فيديو (Brat)\n` +
-                    `🎨 .ghibli-art : ستايل جيبلي\n` +
-                    `◽ .faceswap : بدل الوجه ف التصويرة\n` +
-                    `◽ .ai-enhance : زيين ونقي التصويرة\n` +
-                    `◽ .colorize : لون التصاور القدام\n` +
-                    `✨ .remini : وضح التصويرة الضبابية\n` +
-                    `🎙️ .vocalremover : حيد الموسيقى وخلي الصوت\n\n` +
+                    `🎙️ .vocalremover : عزل الصوت\n\n` +
                     `└──────────────────────┘\n` +
                     `🔙 اكتب *.menu* للرجوع للقائمة.`;
                 return await sendMenu(aiMenu, "AI Menu");
