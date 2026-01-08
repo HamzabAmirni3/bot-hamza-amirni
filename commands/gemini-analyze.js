@@ -1,100 +1,63 @@
 const axios = require('axios');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-const { uploadImage } = require('../lib/uploadImage');
 const settings = require('../settings');
-const { t } = require('../lib/language');
+
+const API_URL = "https://obito-mr-apis.vercel.app/api/ai/analyze";
 
 async function geminiAnalyzeCommand(sock, chatId, msg, args, commands, userLang) {
     try {
-        const question = args.join(' ').trim();
+        let q = msg.quoted ? msg.quoted : msg;
+        let mime = (q.msg || q).mimetype || '';
 
-        let targetMessage = msg;
-        let isImage = msg.message?.imageMessage;
-
-        // Check if it's a reply to an image
-        if (!isImage && msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage) {
-            const quotedInfo = msg.message.extendedTextMessage.contextInfo;
-            targetMessage = {
-                key: { remoteJid: chatId, id: quotedInfo.stanzaId, participant: quotedInfo.participant },
-                message: quotedInfo.quotedMessage
-            };
-            isImage = true;
-        }
-
-        if (!isImage) {
+        if (!/image/.test(mime)) {
             return await sock.sendMessage(chatId, {
-                text: '*⎔ ⋅ ───━ •﹝🔍 جيميني تحليل الصور ﹞• ━─── ⋅ ⎔*\n\n' +
-                    '📝 *الاستخدام:*\n' +
-                    '.جيميني-حلل السؤال\n' +
-                    'ثم قم بالرد على الصورة\n\n' +
-                    '*مثال:*\n' +
-                    '.جيميني-حلل ما الذي في الصورة؟\n' +
-                    'ثم رد على الصورة المراد تحليلها\n\n' +
-                    `⚔️ ${settings.botName}`
+                text: `*⎔ ⋅ ───━ •﹝🧠﹞• ━─── ⋅ ⎔*\n\n` +
+                    `📝 *طريقة الاستخدام:* \nأرسل صورة مع سؤال أو رد على صورة مكتوباً:\n${settings.prefix}حلل من هذه الشخصية؟\n\n` +
+                    `𝐇𝐀𝐌𝐙𝐀 𝐀𝐌𝐈𝐑𝐍𝐈 \n` +
+                    `*⎔ ⋅ ───━ •﹝🧠﹞• ━─── ⋅ ⎔*`
             }, { quoted: msg });
         }
 
-        if (!question) {
-            return await sock.sendMessage(chatId, {
-                text: '❌ يرجى كتابة السؤال\nمثال: .جيميني-حلل ما الذي في الصورة؟'
-            }, { quoted: msg });
-        }
+        const question = args.join(' ') || "ما الموجود في هذه الصورة؟ وذكر اسم الشخصية إن وجدت";
 
         await sock.sendMessage(chatId, { react: { text: "⏳", key: msg.key } });
-        const waitingMsg = await sock.sendMessage(chatId, { text: '🔄 جاري تحميل وتحليل الصورة... يرجى الانتظار.' }, { quoted: msg });
+        const waitingMsg = await sock.sendMessage(chatId, { text: '⏳ جاري تحليل الصورة...' }, { quoted: msg });
 
         try {
-            // 1. Download image
-            const buffer = await downloadMediaMessage(targetMessage, 'buffer', {}, {
-                logger: undefined,
-                reuploadRequest: sock.updateMediaMessage
-            });
+            // Use the .download() method provided by smsg
+            const imgBuffer = await q.download();
 
-            if (!buffer) throw new Error('فشل في تحميل الصورة');
+            if (!imgBuffer) throw new Error('فشل في تحميل الصورة');
 
-            // 2. Upload image to get URL
-            const imageUrl = await uploadImage(buffer);
-            if (!imageUrl) throw new Error('فشل في رفع الصورة');
+            const base64Image = `data:${mime};base64,${imgBuffer.toString('base64')}`;
 
-            // 3. Analyze with Obito API
-            const apiUrl = `https://obito-mr-apis.vercel.app/api/ai/gemini_2.5_flash?txt=${encodeURIComponent(question)}&img=${encodeURIComponent(imageUrl)}`;
-            const response = await axios.get(apiUrl);
-            const result = response.data;
-
-            if (!result.success || !result.result) {
-                throw new Error('فشل في الحصول على تحليل من المحرك');
-            }
+            // Send to API
+            const { data } = await axios.post(API_URL, {
+                image: base64Image,
+                prompt: question,
+                lang: "ar"
+            }, { timeout: 30000 });
 
             // Delete waiting message
             try { await sock.sendMessage(chatId, { delete: waitingMsg.key }); } catch (e) { }
 
-            // 4. Send Result
-            let responseText = '*⎔ ⋅ ───━ •﹝🤖 تحليل جيميني ﹞• ━─── ⋅ ⎔*\n\n';
-            responseText += `❓ *السؤال:* ${question}\n\n`;
-            responseText += `📝 *النتیجة:*\n${result.result}\n\n`;
-            if (result.responseTime) responseText += `⏱️ *زمن الاستجابة:* ${result.responseTime}\n`;
-            responseText += `🕐 *الوقت:* ${new Date().toLocaleString('ar-SA')}\n\n`;
-            responseText += `⚔️ ${settings.botName}`;
+            const aiResult = data.results?.description || "لم يتم العثور على وصف لهذه الصورة.";
 
-            await sock.sendMessage(chatId, {
-                text: responseText,
-                contextInfo: {
-                    externalAdReply: {
-                        title: "GEMINI VISION AI",
-                        body: "𝐇𝐀𝐌𝐙𝐀 𝐀𝐌𝐈𝐑𝐍𝐈",
-                        thumbnailUrl: imageUrl,
-                        sourceUrl: settings.officialChannel,
-                        mediaType: 1,
-                        renderLargerThumbnail: true
-                    }
-                }
-            }, { quoted: msg });
+            let responseText = `*⎔ ⋅ ───━ •﹝🤖 التحليل الذكي ﹞• ━─── ⋅ ⎔*\n\n`;
+            responseText += `${aiResult}\n\n`;
+            responseText += `����� 𝐀𝐌𝐈��� - 𝐎𝐁𝐈𝐓𝐎 ���\n`;
+            responseText += `*⎔ ⋅ ───━ •﹝✅﹞• ━─── ⋅ ⎔*`;
 
+            await sock.sendMessage(chatId, { text: responseText }, { quoted: msg });
             await sock.sendMessage(chatId, { react: { text: "✅", key: msg.key } });
 
         } catch (err) {
             console.error('Gemini Analyze Error:', err);
-            await sock.sendMessage(chatId, { text: `❌ حدث خطأ: ${err.message}` }, { quoted: msg });
+            if (waitingMsg) try { await sock.sendMessage(chatId, { delete: waitingMsg.key }); } catch (e) { }
+
+            const errorMsg = err.response?.data?.error || err.message;
+            await sock.sendMessage(chatId, { text: `❌ حدث خطأ في الـ API.\nالسبب: ${errorMsg}` }, { quoted: msg });
+            await sock.sendMessage(chatId, { react: { text: "❌", key: msg.key } });
         }
 
     } catch (error) {
@@ -103,3 +66,4 @@ async function geminiAnalyzeCommand(sock, chatId, msg, args, commands, userLang)
 }
 
 module.exports = geminiAnalyzeCommand;
+
